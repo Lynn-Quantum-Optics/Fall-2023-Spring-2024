@@ -44,8 +44,8 @@ def QFT(d):
 
 def get_U(d):
     '''Takes the QFT matrix and converts it to single particle basis'''
-    U = QFT(d)
-    # sp.pprint(U)
+    U = QFT(2*d)
+    sp.pprint(U)
     U_t = sp.Matrix(np.kron(U, U))
     # swap adjacent columns
     for j in range(1, 2*d, 2):
@@ -61,8 +61,11 @@ def get_signature(d, c, p):
     # print(bell.shape)
     # sp.pprint(bell.T)
     U = get_U(d)
-    U_t = np.kron(U, U)
-    # print(U_t.shape)
+    print('U shape', U.shape)
+    # U_t = np.kron(U, U)
+    U_t = U
+    print('Ut shape', U_t.shape)
+    print('bell shape', bell.shape)
     return sp.simplify(U_t*bell)
 
 def get_all_signatures(d):
@@ -87,4 +90,32 @@ if __name__=='__main__':
     # T = tsingle_to_joint(d)
     # sp.pprint(T)
     # sp.pprint(np.kron(get_U(d), get_U(d)))
-    sp.pprint(get_all_signatures(d))
+    # sp.pprint(get_all_signatures(d))
+
+    # testing----------------------------------
+    U = sp.Matrix(np.array([[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, 1, -1], [1, -1, -1, 1]]))
+    # sp.pprint(U)
+    # apply U to bell state, take tensor product with each component
+    bell = make_bell(2, 0, 0)
+    def measure_bell(U, d, c, p):
+        '''Makes single bell state of correlation class c and phase class c'''
+        result = sp.Matrix(np.zeros((4*d**2, 1), dtype=complex))
+        for j in range(d):
+            j_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
+            j_vec[j] = 1
+            gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
+            gamma_vec[d+(j+c)%d] = 1
+            result += sp.Matrix(sp.exp(2*sp.pi*1j*p/d)*np.kron(U*j_vec, U*gamma_vec))
+
+        # convert to Sympy
+        result = sp.Matrix(result)
+        result /= sp.sqrt(d)
+        result = sp.simplify(result)
+        sp.pprint(result.T)
+        return result
+    for c in range(d):
+        for p in range(d):
+            print('----------------')
+            print('c = ', c)
+            print('p = ', p)
+            measure_bell(U, d, c, p)
