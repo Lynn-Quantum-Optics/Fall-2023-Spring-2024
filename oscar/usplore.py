@@ -12,8 +12,7 @@ def make_bell(d, c, p):
         j_vec[j] = 1
         gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
         gamma_vec[d+(j+c)%d] = 1
-        result += sp.Matrix(sp.exp(2*sp.pi*1j*p/d)*np.kron(j_vec, gamma_vec))
-
+        result += sp.Matrix(sp.exp(2*sp.pi*1j*j*p/d)*np.kron(j_vec, gamma_vec))
     # convert to Sympy
     result = sp.Matrix(result)
     result /= sp.sqrt(d)
@@ -93,7 +92,26 @@ if __name__=='__main__':
     # sp.pprint(get_all_signatures(d))
 
     # testing----------------------------------
-    U = sp.Matrix(np.array([[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, 1, -1], [1, -1, -1, 1]]))
+    U = 0.5*sp.Matrix(np.array([[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, 1, -1], [1, -1, -1, 1]]))
+    UtU = np.kron(U, U)
+    print('sum of col 2', sum(UtU[:, 2]))
+    print('sum of col 3', sum(UtU[:, 3]))
+    print('sum of col 6', sum(UtU[:, 6]))
+    print('sum of col 7', sum(UtU[:, 7]))
+    for c in range(d):
+        for p in range(d):
+            bell = make_bell(d, c, p)
+           
+            print('----------------')
+            print('c = ', c)
+            print('p = ', p)
+            # sp.pprint(bell.T)
+            sp.pprint((UtU*bell).T)
+
+
+
+    print('!!!------------!!!')
+
     # sp.pprint(U)
     # apply U to bell state, take tensor product with each component
     bell = make_bell(2, 0, 0)
@@ -105,7 +123,7 @@ if __name__=='__main__':
             j_vec[j] = 1
             gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
             gamma_vec[d+(j+c)%d] = 1
-            result += sp.Matrix(sp.exp(2*sp.pi*1j*p/d)*np.kron(U*j_vec, U*gamma_vec))
+            result += sp.Matrix(sp.exp(2*sp.pi*1j*j*p/d)*np.kron(U*j_vec, U*gamma_vec))
 
         # convert to Sympy
         result = sp.Matrix(result)
