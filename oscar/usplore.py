@@ -2,7 +2,7 @@
 
 import sympy as sp
 import numpy as np
-import itertools
+import itertools, sys
 import matplotlib.pyplot as plt
 
 # define bell states for given d
@@ -94,9 +94,9 @@ def convert_kets(sig, d):
             left = i//(2*d)
             right= i % (2*d)
             if len(ket) != 0:
-                ket += f' + {np.round(sig[i],3)}|{left}>|{right}>'
+                ket += f', |{left}>|{right}>: {np.round(sig[i],3)}'
             else:
-                ket += f'{np.round(sig[i],3)}|{left}>|{right}>'
+                ket += f'|{left}>|{right}>: {np.round(sig[i],3)}'
 
     return ket
 
@@ -144,21 +144,71 @@ def get_all_signatures(d, b = True, display=False):
                 print('p = ', p)
                 print(sig_mag)
     signatures = np.array(signatures, dtype=np.float64)
+
+    # normalize signatures by sum since the vector stores probability
+    for i in range(len(signatures)):
+        signatures[i] /= np.sum(signatures[i])
+
+    # remove redundant states
+    signatures_old = signatures
+    unique_signatures = []
+
+    for row in signatures_old:
+        is_duplicate = False
+        for existing_row in unique_signatures:
+            if np.allclose(row, existing_row, atol=10**(-10)):
+                is_duplicate = True
+                print('----')
+                print('signatures unique', unique_signatures)
+                print('redundant state found', row)
+                print('----')
+                break
+            else:
+                print('should be unique', row)
+                print('existing row', existing_row)
+        
+        if not is_duplicate:
+            unique_signatures.append(row)
+
+    signatures = unique_signatures
+
+    # get the corresponding cp values
+    cp = [cp[i] for i in range(len(signatures_old)) if np.isin(signatures_old[i], signatures).all()]
     if display:
-        # remove redundant states
-        print(sig)
-        signatures_old = signatures
-        signatures = np.unique(signatures, axis=0)
-        # get the corresponding cp values
-        cp = [cp[i] for i in range(len(signatures_old)) if np.isin(signatures_old[i], signatures).all()]
         print('----------------')
+        
+    original_stdout = sys.stdout  # Save a reference to the original standard output
+
+    with open(f'output/{d}_{b}.txt', 'w') as f:
+        sys.stdout = f  # Redirect stdout to the file
+        if b:
+            print('**bosonic**')
+        else:
+            print('**fermionic**')
+        print(f'd = {d}\n')
         for i in range(len(signatures)):
             print('c = ', cp[i][0])
             print('p = ', cp[i][1])
-            print(convert_kets(signatures[i], d))
-        
+            print(f'{convert_kets(signatures[i], d)}\n')
+
+        print(f'number of unique states = {len(signatures)}. Matrix as detector mode per row, bell state per column\n')
         sig_mat = sp.Matrix(signatures).reshape(4*d**2, len(signatures))
         sp.pprint(sig_mat)
+        print('\n')
+        print('----------------')
+        print('generating QFT matrix: \n')
+        sp.pprint(QFT(d))
+        print('\n')
+        print('----------------')
+        print('bell states: \n')
+        for c in range(d):
+            for p in range(d):
+                print(f'c = {c}, p = {p}')
+                sp.pprint(make_bell(d, c, p, b).T)
+                print('\n')
+
+    sys.stdout = original_stdout  # Reset stdout back to the original
+            
     return signatures
 
 def distinguish(d,k):
@@ -223,114 +273,20 @@ def distinguish(d,k):
             if elem != 0:
                 i_non_zero.append(1)
         
-        # print(i_th_dots, sum(i_non_zero))
-
-    
-
     # visualize as matrix
     dots = sp.Matrix(precomputed_dots).reshape(len(signatures), len(signatures))
     sp.pprint(dots)
-    # plt.imshow(dots)
-  
-
-    # largest_group_indices = find_largest_orthogonal_group(signatures, precomputed_dots)
-    # largest_group = [signatures[i] for i in largest_group_indices]
-    # for vec in largest_group:
-    #     print(vec)
-
-
-
-
-    # # find all combinations of k states -- RATHER THAN LOADING ALL STATES, USE CNS
-    # combos = list(itertools.combinations(signatures, k))
-    # # compare all detection signatures in combo; need to find if they are orthogonal
-    # print('total', len(combos[0]))
-    # for j, combos_l in enumerate(combos): # go through each combos elements
-    #     for i in range(len(combos_l)-1):
-    #         if sp.simplify(combos_l[i].T*combos_l[i+1])[0] != 0:
-    #             print('not orthogonal', (combos_l[i].T*combos_l[i+1])[0])
-    #             if j == len(combos)-1:
-    #                 print('last combo, not orthogonal')
-    #                 return False
-    # print('orthogonal!')
-    # return True
-
-
 
 if __name__=='__main__':
-    d = 5
-    k = 3
-    get_all_signatures(d, display=True, b=False)
-    # distinguish(d, k)
+    for d in [2, 3, 4, 5, 6, 8, 10, 12]:
+        for stat in [True, False]:
+            get_all_signatures(d, display=True, b=stat)
+    # get_all_signatures(4, display=True, b=True)
 
 
-
-
-
-    # bells = bell_states(d)
-    # for b in bells:
-    #     print('----------------')
-    #     sp.pprint(b.T)
-    # bell = make_bell(d, 0, 1)
-    # sp.pprint(bell.T)
-    # print(len(bell))
-
-    # T = tsingle_to_joint(d)
-    # sp.pprint(T)
-    # sp.pprint(np.kron(get_U(d), get_U(d)))
-    # sp.pprint(get_all_signatures(d))
-
-    # testing----------------------------------
-    # U = 0.5*sp.Matrix(np.array([[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, 1, -1], [1, -1, -1, 1]]))
-    # U = np.linalg.inv(U)
-    # UtU = np.kron(U, U)
-    # print('sum of col 2', sum(UtU[:, 2]))
-    # print('sum of col 3', sum(UtU[:, 3]))
-    # print('sum of col 6', sum(UtU[:, 6]))
-    # print('sum of col 7', sum(UtU[:, 7]))
-    # for c in range(d):
-    #     for p in range(d):
-    #         bell = make_bell(d, c, p)
-           
-    #         print('----------------')
-    #         print('c = ', c)
-    #         print('p = ', p)
-    #         # sp.pprint(bell.T)
-    #         sp.pprint((UtU*bell).T)
-
-
-
-    # print('!!!------------!!!')
-
-    # sp.pprint(U)
-    # apply U to bell state, take tensor product with each component
-    # bell = make_bell(2, 0, 0)
-    # def measure_bell(U, d, c, p):
-    #     '''Makes single bell state of correlation class c and phase class c'''
-    #     result = sp.Matrix(np.zeros((4*d**2, 1), dtype=complex))
-    #     for j in range(d):
-    #         j_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
-    #         j_vec[j] = 1
-    #         gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
-    #         gamma_vec[d+(j+c)%d] = 1
-    #         result += sp.Matrix(sp.exp(2*sp.pi*1j*j*p/d)*np.kron(U*j_vec, U*gamma_vec))
-
-    #     # convert to Sympy
-    #     result = sp.Matrix(result)
-    #     result /= sp.sqrt(d)
-    #     result = sp.simplify(result)
-    #     sp.pprint(result.T)
-    #     return result
-    # for c in range(d):
-    #     for p in range(d):
-    #         print('----------------')
-    #         print('c = ', c)
-    #         print('p = ', p)
-    #         measure_bell(U, d, c, p)
-
+    ## manual testing----------
     # U = sp.Matrix(0.5*np.array([[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, 1, -1], [1, -1, -1, 1]]))
 
-    # # b00 = 0.5*np.array([0, 0, 1, 0, 0,0,0, 1, 1, 0,0,0,0,1,0,0])
     # print((sp.Matrix(np.kron(U, U))*make_bell(2, 0, 0, True)).T)
     # print((sp.Matrix(np.kron(U, U))*make_bell(2, 0, 1, True)).T)
     # print((sp.Matrix(np.kron(U, U))*make_bell(2, 1, 0, True)).T)
