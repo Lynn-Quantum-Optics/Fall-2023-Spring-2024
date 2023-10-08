@@ -3,6 +3,7 @@
 import sympy as sp
 import numpy as np
 import itertools
+import matplotlib.pyplot as plt
 
 # define bell states for given d
 def make_bell(d, c, p, b=True):
@@ -20,21 +21,13 @@ def make_bell(d, c, p, b=True):
         j_vec[j] = 1
         gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
         gamma_vec[d+(j+c)%d] = 1
-        # print(j, np.kron(j_vec, gamma_vec))
+
         result += sp.exp(2*sp.pi*1j*j*p/d) * np.kron(j_vec, gamma_vec)
-
-        # # symmetric case
-        # gamma_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
-        # gamma_vec[(j+c)%d] = 1
-
-        # j_vec = sp.Matrix(np.zeros((2*d, 1), dtype=complex))
-        # j_vec[d+j] = 1
 
         if b:
             result += sp.exp(2*sp.pi*1j*j*p/d)* np.kron(gamma_vec, j_vec)
         else:
             result -= sp.exp(2*sp.pi*1j*j*p/d) * np.kron(gamma_vec, j_vec)
-        # sp.pprint(result.T)
 
     # convert to Sympy
     result = sp.Matrix(result)
@@ -64,25 +57,12 @@ def QFT(d):
         for l in range(d):
             col[l] = sp.exp(2*sp.pi*1j*j*l/d)
         U = U.col_insert(j, col)
-    U/= sp.sqrt(d)
+    U/= sp.sqrt(2*d)
     U = sp.simplify(U)
 
     # now add off diagonal blocks
     U_t = sp.Matrix(np.block([[U, U], [U, -U]]))
     return U_t
-
-# def get_U(d):
-#     '''Takes the QFT matrix and converts it to single particle basis'''
-#     U = QFT(d)
-#     sp.pprint(U)
-#     U_t = sp.Matrix(np.kron(U, U))
-#     # swap adjacent columns
-#     for j in range(1, 2*d, 2):
-#         if j < 2*d-1:
-#             # sp.pprint(U_t.col(j).T)
-#             U_t.col_swap(j, j+1)
-#     # sp.pprint(U_t)
-#     return U_t
 
 def get_signature(d, c, p, b=True):
     '''Returns the signature in detector mode basis for a given bell state.
@@ -102,28 +82,162 @@ def get_signature(d, c, p, b=True):
     U_t = sp.Matrix(np.kron(U, U))
     # print('Ut shape', U_t.shape)
     # print('bell shape', bell.shape)
-    return sp.simplify(U_t*bell)
+    meas =  sp.simplify(U_t*bell)
+    meas = meas.reshape(4*d**2,1)
+    return meas
 
-def get_all_signatures(d, display=False):
+def convert_kets(sig, d):
+    '''Converts the signature to the ket representation'''
+    ket = ''
+    for i in range(len(sig)):
+        if sig[i] != 0:
+            left = i//(2*d)
+            right= i % (2*d)
+            if len(ket) != 0:
+                ket += f' + {np.round(sig[i],3)}|{left}>|{right}>'
+            else:
+                ket += f'{np.round(sig[i],3)}|{left}>|{right}>'
+
+    return ket
+
+
+def get_all_signatures(d, b = True, display=False):
     '''Calls get_signature for all bell states'''
     signatures = []
+    cp= []
     for c in range(d):
         for p in range(d):
-            sig = sp.simplify(get_signature(d, c, p))
+            sig = sp.Matrix(sp.simplify(get_signature(d, c, p, b=b)))
+
+            # apply b/f statistics---------
+            # find if indices like |i>|j> -> |j>|i> are present
+            for n in range(len(sig)):
+                for q in range(n, len(sig)):
+                    if n // (2*d) == q % (2*d) and n % (2*d) == q // (2*d) and n != q and sig[n] != 0 and sig[q] != 0:
+                        if b:
+                            if n < q:
+                                sig[n] += sig[q]
+                                sig[q] = 0
+                            else:
+                                sig[q] += sig[n]
+                                sig[n] = 0
+                        else:
+                            if n < q:
+                                sig[n] -= sig[q]
+                                sig[q] = 0
+                            else:
+                                sig[q] -= sig[n]
+                                sig[n] = 0
+            # -----------------------------
+            sig_mag = []
+            for i in range(4*d**2):
+                val = float((sp.Abs(sig[i]).expand(complex=True))**2)
+                if val < 10**(-10): # remove small values
+                    val = 0.0
+                sig_mag.append(val)
+
+            cp.append((c,p))
+            signatures.append(sig_mag)
             if display:
                 print('----------------')
                 print('c = ', c)
                 print('p = ', p)
-                sp.pprint(sig.T)
-            signatures.append(sig)
+                print(sig_mag)
+    signatures = np.array(signatures, dtype=np.float64)
+    if display:
+        # remove redundant states
+        print(sig)
+        signatures_old = signatures
+        signatures = np.unique(signatures, axis=0)
+        # get the corresponding cp values
+        cp = [cp[i] for i in range(len(signatures_old)) if np.isin(signatures_old[i], signatures).all()]
+        print('----------------')
+        for i in range(len(signatures)):
+            print('c = ', cp[i][0])
+            print('p = ', cp[i][1])
+            print(convert_kets(signatures[i], d))
+        
+        sig_mat = sp.Matrix(signatures).reshape(4*d**2, len(signatures))
+        sp.pprint(sig_mat)
     return signatures
 
 def distinguish(d,k):
     '''Picks out k states from the d^2 bell states' detectio signatures and finds if they are orthogonal.
-    IDEAL: LOOK AT ALL POSSIBLE STATES AND TRY TO FIND AN ORTHOGONAL SET OF k STATES AS OPPOSED TO JUST TRYING IERATIVELY
+    IDEAL: LOOK AT ALL POSSIBLE STATES AND TRY TO FIND AN ORTHOGONAL SET OF k STATES AS OPPOSED TO JUST TRYING IERATIVELY:
+    - start with the first one, see if can find k orthogonal states
     
     '''
     signatures = get_all_signatures(d)
+    # normalize all signatures
+    for i in range(len(signatures)):
+        signatures[i] /= signatures[i].norm()
+
+    # def is_orthogonal(dot_product):
+    #     return np.isclose(dot_product, 0)
+
+    # def find_largest_orthogonal_group(vectors, precomputed_dots, current_group=None, index=0, memo=None):
+    #     if current_group is None:
+    #         current_group = []
+        
+    #     if memo is None:
+    #         memo = {}
+
+    #     if index == len(vectors):
+    #         return current_group
+
+    #     # Early stopping
+    #     if len(current_group) + (len(vectors) - index) <= len(memo.get(tuple(sorted(current_group)), [])):
+    #         return []
+
+    #     state = tuple(sorted(current_group + [index]))
+    #     if state in memo:
+    #         return memo[state]
+
+    #     next_vector = vectors[index]
+
+    #     # If the next_vector is orthogonal to all vectors in current_group, 
+    #     # then explore the possibility of adding it to the group
+    #     if all(is_orthogonal(precomputed_dots[i][index]) for i in current_group):
+    #         with_vector = find_largest_orthogonal_group(vectors, precomputed_dots, current_group + [index], index + 1, memo)
+    #         without_vector = find_largest_orthogonal_group(vectors, precomputed_dots, current_group, index + 1, memo)
+    #         largest = with_vector if len(with_vector) > len(without_vector) else without_vector
+    #     else:
+    #         largest = find_largest_orthogonal_group(vectors, precomputed_dots, current_group, index + 1, memo)
+
+    #     memo[state] = largest
+    #     return largest
+
+    # Precompute dot products
+    precomputed_dots = []
+    for i in range(len(signatures)):
+        i_th_dots = []
+        for j in range(len(signatures)):
+            if i != j:
+                i_th_dots.append(sp.simplify(signatures[i].T*signatures[j])[0])
+            else:
+                i_th_dots.append(0)
+        precomputed_dots.append(i_th_dots)
+        # count number of non-zero elements
+        i_non_zero= []
+        for elem in i_th_dots:
+            if elem != 0:
+                i_non_zero.append(1)
+        
+        # print(i_th_dots, sum(i_non_zero))
+
+    
+
+    # visualize as matrix
+    dots = sp.Matrix(precomputed_dots).reshape(len(signatures), len(signatures))
+    sp.pprint(dots)
+    # plt.imshow(dots)
+  
+
+    # largest_group_indices = find_largest_orthogonal_group(signatures, precomputed_dots)
+    # largest_group = [signatures[i] for i in largest_group_indices]
+    # for vec in largest_group:
+    #     print(vec)
+
 
 
 
@@ -143,12 +257,10 @@ def distinguish(d,k):
 
 
 
-
-
 if __name__=='__main__':
-    d = 3
+    d = 5
     k = 3
-    get_all_signatures(d, display=True)
+    get_all_signatures(d, display=True, b=False)
     # distinguish(d, k)
 
 
