@@ -131,10 +131,12 @@ def get_all_signatures(d, b = True, display=False):
             # -----------------------------
             sig_mag = []
             for i in range(4*d**2):
-                val = float((sp.Abs(sig[i]).expand(complex=True))**2)
-                if val < 10**(-10): # remove small values
-                    val = 0.0
-                sig_mag.append(val)
+                expand = sp.Abs(sig[i].expand(complex=True)).simplify()
+                val =(expand**2).simplify()
+                val_f = float(val.evalf())
+                if val_f < 10**(-10): # remove small values
+                    val_f = 0.0
+                sig_mag.append(val_f)
 
             cp.append((c,p))
             signatures.append(sig_mag)
@@ -278,10 +280,23 @@ def distinguish(d,k):
     sp.pprint(dots)
 
 if __name__=='__main__':
-    for d in [2, 3, 4, 5, 6, 8, 10, 12]:
+    for d in [6]:
         for stat in [True, False]:
             get_all_signatures(d, display=True, b=stat)
-    # get_all_signatures(4, display=True, b=True)
+    # sig = get_signature(6, 1, 1, b=True)
+    # for i in range(4*6**2):
+    #     # try:
+    #     expand = sp.Abs(sig[i].expand(complex=True)).simplify()
+    #     val =(expand**2).simplify()
+    #     val_f = float(val.evalf())
+
+    #         # val = float((sp.Abs(sig[i]).expand(complex=True).evalf())**2)
+    #     # except:
+    #     #     print('val', sig[i])
+    #     #     print('val abs', sp.Abs(sig[i]).expand(complex=True))
+    #     if val_f < 10**(-10): # remove small values
+    #         val_f = 0.0
+        
 
 
     ## manual testing----------
