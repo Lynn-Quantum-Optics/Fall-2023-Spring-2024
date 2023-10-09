@@ -2,8 +2,7 @@
 
 import sympy as sp
 import numpy as np
-import itertools, sys
-import matplotlib.pyplot as plt
+import sys
 
 # define bell states for given d
 def make_bell(d, c, p, b=True):
