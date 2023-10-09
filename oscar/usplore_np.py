@@ -62,7 +62,7 @@ def get_signature(d, c, p, b=True):
     '''
     bell = make_bell(d, c, p, b)
     U = QFT(d)
-    U_t = np.kron(U, U)
+    U_t = np.kron(np.linalg.inv(U), np.linalg.inv(U))
 
     meas =  U_t@bell
     meas = meas.reshape(4*d**2,1)
@@ -207,13 +207,15 @@ if __name__=='__main__':
 
     num_sig_ls = np.array(num_sig_ls)
     print(num_sig_ls)
-    np.save(num_sig_ls, f'output/num_sig_{min_d}_{max_d}.npy')
+    np.save(f'output/num_sig_{min_d}_{max_d}.npy', num_sig_ls)
 
-    plt.figure(figsize=(10,10))
-    plt.plot(range(min_d, max_d+1), num_sig_ls)
+
+    plt.figure(figsize=(7,7))
+    plt.scatter(np.arange(min_d, max_d+1, 1), num_sig_ls)
     plt.xlabel('Dimension of Entanglement')
     plt.ylabel('Number of Unique Signatures')
-    plt.title('$LELM Disnguishability with \mathcal\{U\}_\\text{QFT}$')
+    plt.title('LELM Distinguishability with QFT')
+    plt.tight_layout()
     plt.savefig(f'output/num_sig_{min_d}_{max_d}.pdf')
 
 
