@@ -36,21 +36,41 @@ def make_bell(d, c, p, b=True):
     return result
 
 ## for loss function to minimize ##
-def fidelity(vec1, vec2):
-    '''Returns the fidelity of two bell state vectors in single particle basis'''
-    state1 = vec1 @ vec1.conj().T
-    state2 = vec2 @ vec2.conj().T
-    return (np.trace(np.sqrt(np.sqrt(state1)@state2 @ np.sqrt(state1))))**2
+def reconstruct_bell(coeffs, hyper_basis, d):
+    '''Reconstructs a d = 4 bell state from coefficients in hyperentangled basis'''
+    coeffs_tot = coeffs[:d**2] + 1j*coeffs[d**2:]
+    coeffs_tot = coeffs_tot.reshape((d**2,1))
+    bell = hyper_basis @ coeffs_tot
+    bell = np.round(bell, 10)
+    return bell
 
-def loss(vec1, vec2):
-    '''Returns the loss of two bell state vectors in single particle basis'''
-    return 1 - np.sqrt(fidelity(vec1, vec2))
+
+# def get_fidelity(vec1, vec2):
+#     '''Returns the fidelity of two bell state vectors in single particle basis'''
+#     # divide each of the vectors by their norm
+#     vec1 /= np.linalg.norm(vec1)
+#     vec2 /= np.linalg.norm(vec2)
+#     state1 = vec1 @ vec1.conj().T
+#     state2 = vec2 @ vec2.conj().T
+#     # print(state1)
+#     # print(state2)
+#     return (np.trace(np.sqrt(np.sqrt(state1)@state2 @ np.sqrt(state1))))**2
+
+# def get_loss(coeffs, bell, hyper_basis, d):
+#     '''Returns the loss of two bell state vectors in single particle basis'''
+#     # convert coeffs to complex
+#     coeffs = coeffs.reshape((2*d**2,1))
+#     bell = bell.reshape((d**2,1))
+#     bell_recon = reconstruct_bell(coeffs, hyper_basis, d)
+    
+#     # find the sum of the squared differences
+#     loss = np.sum(np.abs(bell - bell_recon)**2)
+#     return loss
 
 # for finding local transformation for particular c, p in d = 4 ##
 def make_hyperentangled_basis(d=2):
     '''Makes hyperentangled basis as tensor product of two d bell states'''
     hyper_basis = np.zeros((d**4, d**4))
-    print(hyper_basis.shape)
     j = 0
     for c1 in range(d):
         for c2 in range(d):
@@ -63,7 +83,76 @@ def make_hyperentangled_basis(d=2):
 
     return hyper_basis
 
-def find_trans_one(c, p, hyper_basis, d=4, lambda_reg=1e-3):
+# def find_trans_one(c, p, hyper_basis, d=4, max_iter=1000, l_threshold = 1e-5, frac = 0.01, zeta = 0.01, verbose=False):
+#     '''Finds local transformation for a d = 4 bell state given c, p with regularization.
+#     Params:
+#         c (int): correlation class
+#         p (int): phase class
+#         hyper_basis (np.array): hyperentangled basis
+#         d (int): dimension of system
+#         max_iter (int): maximum number of iterations for gradient descent
+#         f_threshold (float): threshold for fidelity of local transformation
+#         frac (float): fraction of max_iter to introduce new random guess if old one hasn't produced new max_fidelity
+#         zeta (float): learning rate
+#         verbose (bool): whether to print out progress
+#     '''
+#     # make bell state
+#     bell = make_bell(d, c, p)
+    
+#     # find coefficients in hyperentangled basis using gradient descent
+#     def guess():
+#         '''Random simplex in d**2 dimensional complex space'''
+#         real_part = np.random.rand(d**2)
+#         imag_part = np.random.rand(d**2)
+#         # Normalize the vector as all real concatenated with all imaginary
+#         return np.concatenate((real_part, imag_part)) 
+
+#     def minimize_fid(coeffs):
+#         '''Minimizes loss function for given coefficients'''
+#         result = minimize(get_loss, coeffs, args=(bell, hyper_basis, d), method='Nelder-Mead', tol=1e-10)
+
+#         return result.x, 1 - result.fun
+
+#     coeffs = guess()
+#     coeffs, loss = minimize_fid(coeffs)
+
+#     max_coeffs = coeffs
+#     min_loss = loss
+
+#     get_loss_args = partial(get_loss, bell=bell, hyper_basis=hyper_basis, d=d)
+
+#     n = 0
+#     index_since_improvement =0
+#     while min_loss > l_threshold and n < max_iter:
+#         if verbose:
+#             print(n, min_loss, coeffs)
+        
+#         gradient = approx_fprime(coeffs, get_loss_args, epsilon=1e-8) # epsilon is step size in finite difference
+
+#         # update coeff based on gradient
+#         coeffs = [max_coeffs[i] - zeta*gradient[i] for i in range(len(max_coeffs))]
+
+#         coeffs, loss = minimize_fid(coeffs)
+
+#         if loss < min_loss:
+#             min_loss = loss
+#             max_coeffs = coeffs
+#             index_since_improvement = 0
+#             if loss < l_threshold:
+#                 break
+#         else:
+#             index_since_improvement += 1
+#             if index_since_improvement > frac * max_iter:
+#                 coeffs = guess()
+#                 coeffs, fidelity = minimize_fid(coeffs)
+#                 index_since_improvement = 0
+
+#         n += 1
+
+#     return max_coeffs, min_loss
+
+
+def find_trans_one(c, p, hyper_basis, d=4, lambda_reg=1e-6):
     '''Finds local transformation for a d = 4 bell state given c, p with regularization'''
     # make bell state
     bell = make_bell(d, c, p)
@@ -101,21 +190,15 @@ def find_trans_all(d=4):
     results_pd.to_csv(f'transformation_matrix_joint_{d}.csv')
     return results, resid_ls
 
-def reconstruct_bell(coeffs, hyper_basis):
-    '''Reconstructs a d = 4 bell state from coefficients in hyperentangled basis'''
-    bell = hyper_basis @ coeffs
-    bell = np.round(bell, 10)
-    return bell
-
 
 if __name__ == '__main__':
     hyper_basis = make_hyperentangled_basis(2)
 
     print(make_bell(4, 0, 0))
-    print(reconstruct_bell(find_trans_one(0, 0, hyper_basis)[0], hyper_basis))
-    print('------')
-    print(make_bell(4, 0, 1))
-    print(reconstruct_bell(find_trans_one(0, 1, hyper_basis)[0], hyper_basis))
+    print(reconstruct_bell(find_trans_one(0, 0, hyper_basis)[0], hyper_basis, 4))
+    # print('------')
+    # print(make_bell(4, 0, 1))
+    # print(reconstruct_bell(find_trans_one(0, 1, hyper_basis)[0], hyper_basis))
 
     # print(make_bell(4, 0, 0))
     # print(make_bell(4, 0, 1))
