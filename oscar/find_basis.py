@@ -21,51 +21,25 @@ def make_bell(d, c, p, b=True):
         index = d*j + gamma
         j_vec[index] = 1
 
-
-        # add symmetric/antisymmetric part
-        if b:
-            sym_index = d*gamma + j
-            j_vec[sym_index] = 1
-        else:
-            asym_index = d*gamma + j
-            j_vec[asym_index] = -1
+        # # add symmetric/antisymmetric part
+        # if b:
+        #     sym_index = d*gamma + j
+        #     j_vec[sym_index] = 1
+        # else:
+        #     asym_index = d*gamma + j
+        #     j_vec[asym_index] = -1
 
         result += np.exp(2*np.pi*1j*j*p/d) * j_vec
 
-    result /= np.sqrt(2*d)
+    result /= np.sqrt(d)
     return result
 
 ## for loss function to minimize ##
-def reconstruct_bell(coeffs, hyper_basis, d):
-    '''Reconstructs a d = 4 bell state from coefficients in hyperentangled basis'''
-    coeffs_tot = coeffs[:d**2] + 1j*coeffs[d**2:]
-    coeffs_tot = coeffs_tot.reshape((d**2,1))
-    bell = hyper_basis @ coeffs_tot
+def reconstruct_bell(coeffs, hyper_basis):
+    '''Reconstructs a (big) d bell state from coefficients in hyperentangled basis'''
+    bell = hyper_basis @ coeffs
     bell = np.round(bell, 10)
     return bell
-
-
-# def get_fidelity(vec1, vec2):
-#     '''Returns the fidelity of two bell state vectors in single particle basis'''
-#     # divide each of the vectors by their norm
-#     vec1 /= np.linalg.norm(vec1)
-#     vec2 /= np.linalg.norm(vec2)
-#     state1 = vec1 @ vec1.conj().T
-#     state2 = vec2 @ vec2.conj().T
-#     # print(state1)
-#     # print(state2)
-#     return (np.trace(np.sqrt(np.sqrt(state1)@state2 @ np.sqrt(state1))))**2
-
-# def get_loss(coeffs, bell, hyper_basis, d):
-#     '''Returns the loss of two bell state vectors in single particle basis'''
-#     # convert coeffs to complex
-#     coeffs = coeffs.reshape((2*d**2,1))
-#     bell = bell.reshape((d**2,1))
-#     bell_recon = reconstruct_bell(coeffs, hyper_basis, d)
-    
-#     # find the sum of the squared differences
-#     loss = np.sum(np.abs(bell - bell_recon)**2)
-#     return loss
 
 # for finding local transformation for particular c, p in d = 4 ##
 def make_hyperentangled_basis(d=2):
@@ -83,96 +57,17 @@ def make_hyperentangled_basis(d=2):
 
     return hyper_basis
 
-# def find_trans_one(c, p, hyper_basis, d=4, max_iter=1000, l_threshold = 1e-5, frac = 0.01, zeta = 0.01, verbose=False):
-#     '''Finds local transformation for a d = 4 bell state given c, p with regularization.
-#     Params:
-#         c (int): correlation class
-#         p (int): phase class
-#         hyper_basis (np.array): hyperentangled basis
-#         d (int): dimension of system
-#         max_iter (int): maximum number of iterations for gradient descent
-#         f_threshold (float): threshold for fidelity of local transformation
-#         frac (float): fraction of max_iter to introduce new random guess if old one hasn't produced new max_fidelity
-#         zeta (float): learning rate
-#         verbose (bool): whether to print out progress
-#     '''
-#     # make bell state
-#     bell = make_bell(d, c, p)
-    
-#     # find coefficients in hyperentangled basis using gradient descent
-#     def guess():
-#         '''Random simplex in d**2 dimensional complex space'''
-#         real_part = np.random.rand(d**2)
-#         imag_part = np.random.rand(d**2)
-#         # Normalize the vector as all real concatenated with all imaginary
-#         return np.concatenate((real_part, imag_part)) 
-
-#     def minimize_fid(coeffs):
-#         '''Minimizes loss function for given coefficients'''
-#         result = minimize(get_loss, coeffs, args=(bell, hyper_basis, d), method='Nelder-Mead', tol=1e-10)
-
-#         return result.x, 1 - result.fun
-
-#     coeffs = guess()
-#     coeffs, loss = minimize_fid(coeffs)
-
-#     max_coeffs = coeffs
-#     min_loss = loss
-
-#     get_loss_args = partial(get_loss, bell=bell, hyper_basis=hyper_basis, d=d)
-
-#     n = 0
-#     index_since_improvement =0
-#     while min_loss > l_threshold and n < max_iter:
-#         if verbose:
-#             print(n, min_loss, coeffs)
-        
-#         gradient = approx_fprime(coeffs, get_loss_args, epsilon=1e-8) # epsilon is step size in finite difference
-
-#         # update coeff based on gradient
-#         coeffs = [max_coeffs[i] - zeta*gradient[i] for i in range(len(max_coeffs))]
-
-#         coeffs, loss = minimize_fid(coeffs)
-
-#         if loss < min_loss:
-#             min_loss = loss
-#             max_coeffs = coeffs
-#             index_since_improvement = 0
-#             if loss < l_threshold:
-#                 break
-#         else:
-#             index_since_improvement += 1
-#             if index_since_improvement > frac * max_iter:
-#                 coeffs = guess()
-#                 coeffs, fidelity = minimize_fid(coeffs)
-#                 index_since_improvement = 0
-
-#         n += 1
-
-#     return max_coeffs, min_loss
-
-
-def find_trans_one(c, p, hyper_basis, d=4, lambda_reg=1e-6):
+def find_trans_one(c, p, hyper_basis, d=4, alpha=0.0001):
     '''Finds local transformation for a d = 4 bell state given c, p with regularization'''
     # make bell state
     bell = make_bell(d, c, p)
-    # add regularization term to hyper_basis
-    hyper_basis_reg = hyper_basis.T @ hyper_basis + lambda_reg * np.eye(hyper_basis.shape[1])
-    # compute the regularized pseudo-inverse of hyper_basis
-    hyper_basis_pinv_reg = np.linalg.inv(hyper_basis_reg) @ hyper_basis.T
-    # express bell as linear combination of hyperentangled basis; find coefficients
-    coeffs = hyper_basis_pinv_reg @ bell
-    # confirm solution is correct within a tolerance
-    bell_recon = hyper_basis @ coeffs
-    if not np.allclose(bell, bell_recon, atol=1e-10):
-        print("Warning: the bell state reconstruction is not within the desired tolerance.")
-    # compute the residual
-    resid = np.linalg.norm(bell - bell_recon)**2
+    coeffs = np.linalg.lstsq(hyper_basis, bell, rcond=None)[0]
+    resid = np.linalg.norm(bell - hyper_basis @ coeffs)
     return coeffs, resid
 
 def find_trans_all(d=4):
     '''Returns matrix for expression for all d = 4 bell states in terms of hyperentangled basis'''
-    hyper_basis = make_hyperentangled_basis(d)
+    hyper_basis = make_hyperentangled_basis(int(np.sqrt(d)))
     results = np.zeros((d**2, d**2), dtype=complex)
     resid_ls = []
     j = 0
@@ -184,18 +79,122 @@ def find_trans_all(d=4):
             results[:, j] = cp_trans
             resid_ls.append(resid)
             j+=1
-            if j ==1:
-                print(results)
+    
+    # round resulting matrix
+    results = np.round(results, 10)
     results_pd = pd.DataFrame(results)
-    results_pd.to_csv(f'transformation_matrix_joint_{d}.csv')
+    results_pd.to_csv(f'local_transform/transformation_matrix_joint_{d}.csv')
+    with open(f'local_transform/transformation_matrix_joint_{d}_latex.txt', 'w') as f:
+        f.write(np_to_latex(results))
     return results, resid_ls
 
+# function to convert to single particle basis #
+# single particle basis is { |0, L>,  |1, L>,  |d-1, L>, |0, R>, |1, R>, |d-1, R> }
+def convert_to_single_particle(results, d=4, in_type='coeffs'):
+    '''Converts coefficient matrix from hyperentangled basis to single particle basis in the big d system.
+    Params:
+    results (np.array): matrix of in standard basis
+    d (int): dimension of system
+    in_type (str): whether we're dealing with special case of coefficient matrix or just some arbitrary bell state
+    '''
+    results_shape = results.shape
+    # make single particle basis
+    single_particle_results = np.zeros((4*d**2, results_shape[1]), dtype=complex)
+    
+    if results_shape[1] > 1:
+        for j in range(d**2):
+            # convert column to single particle basis
+            col = results[:, j]
+            col_single = np.zeros((4*d**2, 1), dtype=complex)
+            for i in range(d**2):
+                if col[i] != 0:
+                    left = i % d  # location within joint particle basis
+                    right = d+i//d
+
+                    # get corresponding vector in single particle basis
+                    left_vec = np.zeros((2*d, 1), dtype=complex)
+                    left_vec[left] = 1
+                    right_vec = np.zeros((2*d, 1), dtype=complex)
+                    right_vec[right] = 1
+                    # take tensor product, scale by coefficient
+
+                    col_single += col[i]*np.kron(left_vec, right_vec)
+            # append as column to single_particle_results
+            single_particle_results[:, j] = col_single.reshape((4*d**2))
+        if in_type == 'coeffs':
+            single_particle_results = np.round(single_particle_results, 10)
+            single_particle_results_pd = pd.DataFrame(single_particle_results)
+            single_particle_results_pd.to_csv(f'local_transform/transformation_matrix_single_{d}.csv')
+
+            with open(f'local_transform/transformation_matrix_single_{d}_latex.txt', 'w') as f:
+                f.write(np_to_latex(single_particle_results))
+    else:
+        col = results
+        col_single = np.zeros((4*d**2, 1), dtype=complex)
+        for i in range(d**2):
+            if col[i] != 0:
+                left = i // d
+                right = d+i%d
+
+                # get corresponding vector in single particle basis
+                left_vec = np.zeros((2*d, 1), dtype=complex)
+                left_vec[left] = 1
+                right_vec = np.zeros((2*d, 1), dtype=complex)
+                right_vec[right] = 1
+
+                # take tensor product, scale by coefficient
+                col_single += col[i]*np.kron(left_vec, right_vec)
+        single_particle_results = col_single.reshape((4*d**2))
+        single_particle_results = np.round(single_particle_results, 10)
+
+    return single_particle_results
+
+# ---- helper function to  convert output to bmatrix in latex ---- #
+def np_to_latex(array, precision=2):
+    '''Converts a numpy array to a LaTeX bmatrix environment'''
+    def format_complex(c, precision):
+        '''Formats a complex number as a string'''
+        if not(np.isclose(c.real, 0)) and not(np.isclose(c.imag, 0)):
+            return format(c.real, f".{precision}f") + " + " + format(c.imag, f".{precision}f") + "i"
+        elif np.isclose(c.imag, 0) and not(np.isclose(c.real, 0)):
+            return format(c.real, f".{precision}f")
+        elif np.isclose(c.real, 0) and not(np.isclose(c.imag, 0)):
+            return format(c.imag, f".{precision}f") + "i"
+        else:
+            return "0"
+    
+    latex_str = "\\begin{bmatrix}\n"
+    for row in array:
+        row_str = " & ".join(format_complex(x, precision) for x in row)
+        latex_str += row_str + " \\\\\n"
+    latex_str += "\\end{bmatrix}"
+    return latex_str
 
 if __name__ == '__main__':
-    hyper_basis = make_hyperentangled_basis(2)
+    d = 4
+    results, resid_ls = find_trans_all(4)
+    print(results)
+    print(resid_ls)
 
-    print(make_bell(4, 0, 0))
-    print(reconstruct_bell(find_trans_one(0, 0, hyper_basis)[0], hyper_basis, 4))
+    # convert to single particle basis
+    single_particle_results = convert_to_single_particle(results, d)
+
+    # factor into tensor product of U_L and U_R
+    A, B = factor_single_particle(single_particle_results, d)
+    print(A)
+    print(B)
+    
+
+
+    
+
+    ## ----------- testing ----------- ##
+    # print(convert_to_single_particle(make_bell(d, 1, 2), d))
+
+    # hyper_basis = make_hyperentangled_basis(2)
+    # print(make_bell(4, 1, 0))
+    # print(reconstruct_bell(find_trans_one(1, 0, hyper_basis)[0], hyper_basis))
+    # print('here')
     # print('------')
     # print(make_bell(4, 0, 1))
     # print(reconstruct_bell(find_trans_one(0, 1, hyper_basis)[0], hyper_basis))
