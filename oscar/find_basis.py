@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from tensorly.decomposition import tucker
+from tensorly.tenalg import multi_mode_dot
 from scipy.optimize import minimize, approx_fprime
 
 ## define bell states for given d in joint-particle basis ##
@@ -179,7 +180,7 @@ def get_single_particle(results, d=4, in_type='coeffs'):
     return single_particle_results
 
 # ---- helper function to  convert output to bmatrix in latex ---- #
-def np_to_latex(array, precision=2):
+def np_to_latex(array, precision=3):
     '''Converts a numpy array to a LaTeX bmatrix environment'''
     def format_complex(c, precision):
         '''Formats a complex number as a string'''
@@ -191,13 +192,31 @@ def np_to_latex(array, precision=2):
             return format(c.imag, f".{precision}f") + "i"
         else:
             return "0"
-    
-    latex_str = "\\begin{bmatrix}\n"
-    for row in array:
-        row_str = " & ".join(format_complex(x, precision) for x in row)
-        latex_str += row_str + " \\\\\n"
-    latex_str += "\\end{bmatrix}"
+        
+    # get shape of array
+    shape = array.shape
+    print(shape)
+
+    if len(shape) == 2:
+        latex_str = "\\begin{bmatrix}\n"
+        for row in array:
+            row_str = " & ".join(format_complex(x, precision) for x in row)
+            latex_str += row_str + " \\\\\n"
+        latex_str += "\\end{bmatrix}"
+
+    elif len(shape) == 4: # if tensor
+        latex_str = ""
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                latex_str += "\\begin{bmatrix}\n"
+                for k in range(shape[2]):
+                    row = array[i, j, k, :]
+                    row_str = " & ".join(format_complex(x, precision) for x in row)
+                    latex_str += row_str + " \\\\\n"
+                latex_str += "\\end{bmatrix}"
+                latex_str += ",\n"
     return latex_str
+    
 
 # function to factor into tensor product of U_L and U_R #
 def get_rank(A):
@@ -206,22 +225,24 @@ def get_rank(A):
 
 def factorize_tucker(C, d, save_latex = False):
     '''Factor a d^2 x d^2 matrix into a tensor product of two d x d matrices.'''
-    # Reshape C into a tensor of shape (d, d, d, d)
+    # reshape C into a tensor of shape (d, d, d, d)
     tensor = C.reshape(d, d, d, d)
-    print(d)
 
-    # Perform Tucker decomposition on the tensor
+    # perform Tucker decomposition on the tensor
     core, factors = tucker(tensor, rank=[d, d, d, d])
 
-    # The factors are what we can use to approximate A and B
-    # Since the decomposition is not unique, we take the first two for A and B
+    # the factors are what we can use to approximate A and B
+    # since the decomposition is not unique, we take the first two for A and B
     A = factors[0]
     B = factors[1]
 
     print(A.shape)
     print(B.shape)
 
-    C_recon = np.kron(A, B)
+    # reconstruct C from the factors and reshape from (d,d,d,d) tensor back to (d^2, d^2) matrix
+    C_recon  = multi_mode_dot(core, factors, modes=[0, 1, 2, 3])
+
+    C_recon = C_recon.reshape(d**2, d**2)
 
     print(np.isclose(C, C_recon, atol=1e-10).all())
 
@@ -232,53 +253,21 @@ def factorize_tucker(C, d, save_latex = False):
         with open(f'local_transform/tucker_factorization_{d}_latex.txt', 'w') as f:
             f.write('A:\n')
             f.write(np_to_latex(A))
+            f.write('--------------------\n')
             f.write('B:\n')
             f.write(np_to_latex(B))
+            f.write('--------------------\n')
+            f.write('Core tensor:\n')
+            f.write(np_to_latex(core))
+            f.write('--------------------\n')
             f.write('C_recon:\n')
             f.write(np_to_latex(C_recon))
+            f.write('--------------------\n')
             f.write('Norm of difference:\n')
             f.write(str(diff_norm))
-
-
-    return A, B
-
-def factorize_svd(C, d, save_latex = False):
-    '''Factor a d^2 x d^2 matrix into a tensor product of two d x d matrices.'''
-    # Reshape the matrix C into a 4D tensor with shape (d, d, d, d)
-    tensor = C.reshape(d, d, d, d)
-    
-    # Unfold the tensor into matrices
-    matrices = [tensor.transpose(i, j, k, l).reshape(d**2, d**2) for i, j, k, l in [(0, 2, 1, 3), (0, 3, 1, 2)]]
-    
-    # Apply SVD to each matrix and take the component with the largest singular value
-    components = [np.linalg.svd(mat, full_matrices=False)[0][:, 0].reshape(d, d) for mat in matrices]
-    
-    # Normalize the components
-    norm_factor = np.sqrt(np.linalg.norm(components[0]) * np.linalg.norm(components[1]))
-    A = components[0] / norm_factor
-    B = components[1] / norm_factor
-
-    print(A.shape)
-    print(B.shape)
-
-    C_recon = np.kron(A, B)
-
-    print(np.isclose(C, C_recon, atol=1e-10).all())
-
-    diff_norm = np.linalg.norm(C - C_recon)
-    print(diff_norm)
-
-    if save_latex:
-        with open(f'local_transform/svd_factorization_{d}_latex.txt', 'w') as f:
-            f.write('A:\n')
-            f.write(np_to_latex(A))
-            f.write('B:\n')
-            f.write(np_to_latex(B))
-            f.write('C_recon:\n')
-            f.write(np_to_latex(C_recon))
-            f.write('Norm of difference:\n')
-            f.write(str(diff_norm))
-    
+       
+        # print out images
+            
     return A, B
 
 def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e-4, verbose = False, save_latex=False):
@@ -368,15 +357,19 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
         with open(f'local_transform/gd_factorization_{d}_{alpha}_latex.txt', 'w') as f:
             f.write('U_L:\n')
             f.write(np_to_latex(U_L))
+            f.write('--------------------\n')
             f.write('U_R:\n')
             f.write(np_to_latex(U_R))
+            f.write('--------------------\n')
             f.write('C_recon:\n')
             f.write(np_to_latex(C_recon))
+            f.write('--------------------\n')
             f.write('Norm of difference:\n')
             f.write(str(diff_norm))
+            f.write('--------------------\n')
             f.write('Num iterations:\n')
             f.write(str(n))
-            f.write('')
+            f.write('--------------------\n')
             f.write('Learning rate:\n')
             f.write(str(alpha))
 
@@ -393,35 +386,20 @@ if __name__ == '__main__':
                 print(np.isclose(converted_bell, single_bell, atol = 1e-10).all())
 
     d = 4
-    # check_bell_func_agree(d)
-
     results, resid_ls = find_trans_all(4)
     print(results)
     print(resid_ls)
 
     # factorize_tucker(results, d, save_latex=True)
-    # factorize_svd(results, d, save_latex=True)
-    factorize_gd(results, d, alpha=.1, verbose=True, save_latex=True)
-    # print(hosvd(results))
+    # factorize_gd(results, d, alpha=1, verbose=True, save_latex=True)
 
 
 
-    # # convert to single particle basis
+    ## convert to single particle basis ##
     # single_particle_results = get_single_particle(results, d)
 
     
 
-
-
-           
-            
-
-    # factor into tensor product of U_L and U_R
-    # print(factorize_tensor(results, d))
-    
-
-
-    
 
     ## ----------- testing ----------- ##
     # print(get_single_particle(make_bell(d, 1, 2), d))
