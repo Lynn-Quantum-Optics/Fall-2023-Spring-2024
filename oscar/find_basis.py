@@ -2,10 +2,11 @@
 
 import numpy as np
 import pandas as pd
-from itertools import permutations
+from tensorly.decomposition import tucker
+from scipy.optimize import minimize, approx_fprime
 
 ## define bell states for given d in joint-particle basis ##
-def make_bell(d, c, p, b=True):
+def make_bell(d, c, p):
     '''Makes single bell state of correlation class c and phase class c.
     Parameters:
     d (int): dimension of system
@@ -31,6 +32,27 @@ def make_bell(d, c, p, b=True):
         #     j_vec[asym_index] = -1
 
         result += np.exp(2*np.pi*1j*j*p/d) * j_vec
+
+    result /= np.sqrt(d)
+    return result
+
+def make_bell_single(d, c, p):
+    '''Makes single bell state of correlation class c and phase class c.
+    Parameters:
+    d (int): dimension of system
+    c (int): correlation class
+    p (int): phase class
+    b (bool): whether to assume bosonic or fermionic statistics
+
+    '''
+    result = np.zeros((4*d**2, 1), dtype=complex)
+    for j in range(d):
+        j_vec = np.zeros((2*d, 1), dtype=complex)
+        j_vec[j] = 1
+        gamma_vec = np.zeros((2*d, 1), dtype=complex)
+        gamma_vec[d+(j+c)%d] = 1
+
+        result += np.exp(2*np.pi*1j*j*p/d) * np.kron(j_vec, gamma_vec)
 
     result /= np.sqrt(d)
     return result
@@ -178,87 +200,221 @@ def np_to_latex(array, precision=2):
     return latex_str
 
 # function to factor into tensor product of U_L and U_R #
-def is_rank_1(A):
+def get_rank(A):
+    '''Checks rank of matrix'''
+    return np.linalg.matrix_rank(A)
+
+def factorize_tucker(C, d, save_latex = False):
     '''Factor a d^2 x d^2 matrix into a tensor product of two d x d matrices.'''
+    # Reshape C into a tensor of shape (d, d, d, d)
+    tensor = C.reshape(d, d, d, d)
+    print(d)
 
-    U, S, Vt = np.linalg.svd(A)
+    # Perform Tucker decomposition on the tensor
+    core, factors = tucker(tensor, rank=[d, d, d, d])
 
-    # Check if A is of rank 1
-    is_rank_1 = np.count_nonzero(S) == 1
-    print(is_rank_1)
+    # The factors are what we can use to approximate A and B
+    # Since the decomposition is not unique, we take the first two for A and B
+    A = factors[0]
+    B = factors[1]
 
-def factorize_tensor(C, d):
+    print(A.shape)
+    print(B.shape)
+
+    C_recon = np.kron(A, B)
+
+    print(np.isclose(C, C_recon, atol=1e-10).all())
+
+    diff_norm = np.linalg.norm(C - C_recon)
+    print(diff_norm)
+
+    if save_latex:
+        with open(f'local_transform/tucker_factorization_{d}_latex.txt', 'w') as f:
+            f.write('A:\n')
+            f.write(np_to_latex(A))
+            f.write('B:\n')
+            f.write(np_to_latex(B))
+            f.write('C_recon:\n')
+            f.write(np_to_latex(C_recon))
+            f.write('Norm of difference:\n')
+            f.write(str(diff_norm))
+
+
+    return A, B
+
+def factorize_svd(C, d, save_latex = False):
     '''Factor a d^2 x d^2 matrix into a tensor product of two d x d matrices.'''
-
-    d = int(np.sqrt(C.shape[0]))
-    # Reshape C into a 3D tensor
-    tensor = C.reshape((d, d, d, d))
-
-    # Move axes of the tensor
-    tensor = np.moveaxis(tensor, (1, 3), (0, 2))
-
-    # Reshape tensor into a 2D matrix
-    matrix = tensor.reshape((d**2, d**2))
-
-    # Apply SVD
-    U, S, Vh = np.linalg.svd(matrix)
-
-    # Check if the matrix is separable
-    is_separable = np.count_nonzero(S) == 1
-
-    if is_separable:
-        # Compute A and B
-        A = U @ np.sqrt(np.diag(S))
-        B = np.sqrt(np.diag(S)) @ Vh
-        return A, B
-    else:
-        print("The matrix is not separable.")
-        return None
+    # Reshape the matrix C into a 4D tensor with shape (d, d, d, d)
+    tensor = C.reshape(d, d, d, d)
     
-    # # Compute the SVD
-    # U, S, Vt = np.linalg.svd(A)
+    # Unfold the tensor into matrices
+    matrices = [tensor.transpose(i, j, k, l).reshape(d**2, d**2) for i, j, k, l in [(0, 2, 1, 3), (0, 3, 1, 2)]]
+    
+    # Apply SVD to each matrix and take the component with the largest singular value
+    components = [np.linalg.svd(mat, full_matrices=False)[0][:, 0].reshape(d, d) for mat in matrices]
+    
+    # Normalize the components
+    norm_factor = np.sqrt(np.linalg.norm(components[0]) * np.linalg.norm(components[1]))
+    A = components[0] / norm_factor
+    B = components[1] / norm_factor
 
-    # # The first columns of U and V are the left and right singular vectors
-    # u = U[:, 0]
-    # v = Vt.T[:, 0]
+    print(A.shape)
+    print(B.shape)
 
-    # # The matrix A is the outer product of u and v scaled by the singular value
-    # A_approx = S[0] * np.outer(u, v)
+    C_recon = np.kron(A, B)
 
-    # # Get the number of columns in A
-    # num_cols = A.shape[1]
+    print(np.isclose(C, C_recon, atol=1e-10).all())
 
-    # # Generate all permutations of column indices
-    # perms = permutations(range(num_cols))
+    diff_norm = np.linalg.norm(C - C_recon)
+    print(diff_norm)
 
-    # # Apply each permutation to A
-    # for perm in perms:
-    #     A_perm = A[:, perm]
+    if save_latex:
+        with open(f'local_transform/svd_factorization_{d}_latex.txt', 'w') as f:
+            f.write('A:\n')
+            f.write(np_to_latex(A))
+            f.write('B:\n')
+            f.write(np_to_latex(B))
+            f.write('C_recon:\n')
+            f.write(np_to_latex(C_recon))
+            f.write('Norm of difference:\n')
+            f.write(str(diff_norm))
+    
+    return A, B
 
-    #     # Compute the SVD of the permuted matrix
-    #     U_perm, S_perm, Vt_perm = np.linalg.svd(A_perm)
+def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e-4, verbose = False, save_latex=False):
+    '''Factorize a d^2 x d^2 matrix into a tensor product of two d x d matrices using gradient descent'''
 
-    #     # The first columns of U_perm and Vt_perm are the left and right singular vectors
-    #     u_perm = U_perm[:, 0]
-    #     v_perm = Vt_perm.T[:, 0]
+    def random():
+        '''Guess d^2 + d^2 random complex components, split into all real and imaginary parts'''
+        guess = np.random.rand(4*d**2)
+        return guess
+    
+    def construct_Us(coeff):
+        coeff_L = coeff[:2*d**2].reshape(2*d**2, 1)
+        coeff_R = coeff[2*d**2:].reshape(2*d**2, 1)
 
-    #     # The permuted matrix A_perm is the outer product of u_perm and v_perm scaled by the singular value
-    #     A_perm_approx = S_perm[0] * np.outer(u_perm, v_perm)
+        # assign coeff_L[i] + i*coeff_L[i+d^2] to U_L[i]
+        U_L = coeff_L[:d**2] + 1j*coeff_L[d**2:]
+        U_L = U_L.reshape(d, d)
+        # assign coeff_R[i] + i*coeff_R[i+d^2] to U_R[i]
+        U_R = coeff_R[:d**2] + 1j*coeff_R[d**2:]
+        U_R = U_R.reshape(d, d)
 
-    #     # If the approximation is close to A, we have found the correct permutation
-    #     if np.allclose(A_perm_approx, A_approx, atol=1e-10):
-    #         print("Found the correct permutation!")
-    #         break
+        return U_L, U_R
+    
+    def get_loss(coeff):
+        '''Loss function to minimize'''
+        U_L, U_R = construct_Us(coeff)
+        return np.linalg.norm(C - np.kron(U_L, U_R))
+    
+    def minimize_loss(coeff):
+        result = minimize(get_loss, coeff, method='Nelder-Mead')
+        return result.x, result.fun
+    
+    coeff_r = random()
+    coeff, loss = minimize_loss(coeff_r)
 
+    best_coeff = coeff
+    grad_coeff = coeff
+    best_loss = loss
+
+    n = 0
+    index_since_improvement = 0
+    while n < max_iter and best_loss > loss_thres:
+        if verbose:
+            print(f'Iteration {n}')
+            print(f'Current loss: {loss}')
+            print(f'Best loss: {best_loss}')
+            print(f'Index since improvement: {index_since_improvement}')
+            print('-------------------')
+
+        if index_since_improvement % (frac*max_iter)==0: # periodic random search (hop)
+            coeff = random()
+            grad_coeff = coeff
+            index_since_improvement = 0
+        else:
+            gradient = approx_fprime(grad_coeff, get_loss, epsilon=1e-8) # epsilon is step size in finite difference
+
+            # update angles
+            coeff = grad_coeff - alpha*gradient
+            grad_coeff = coeff
+
+        # update loss
+        coeff_m, loss = minimize_loss(coeff)
+        coeff = coeff_m
+
+        # update best loss
+        if loss < best_loss:
+            best_loss = loss
+            best_coeff = coeff
+            index_since_improvement = 0
+        else:
+            index_since_improvement += 1
+
+        n += 1
+
+    U_L, U_R = construct_Us(best_coeff)
+    print(U_L.shape)
+    print(U_R.shape)
+
+    C_recon = np.kron(U_L, U_R)
+
+    print(np.isclose(C, C_recon, atol=1e-10).all())
+
+    diff_norm = best_loss
+    print(best_loss)
+
+    if save_latex:
+        with open(f'local_transform/gd_factorization_{d}_{alpha}_latex.txt', 'w') as f:
+            f.write('U_L:\n')
+            f.write(np_to_latex(U_L))
+            f.write('U_R:\n')
+            f.write(np_to_latex(U_R))
+            f.write('C_recon:\n')
+            f.write(np_to_latex(C_recon))
+            f.write('Norm of difference:\n')
+            f.write(str(diff_norm))
+            f.write('Num iterations:\n')
+            f.write(str(n))
+            f.write('')
+            f.write('Learning rate:\n')
+            f.write(str(alpha))
 
 if __name__ == '__main__':
+    def check_bell_func_agree(d):
+        '''Assumes d is square of some integer'''
+        hyper_basis = make_hyperentangled_basis(int(np.sqrt(d)))
+        for c in range(d):
+            for p in range(d):
+                # check if converted form matches definition
+                converted_bell = get_single_particle(reconstruct_bell(find_trans_one(c, p, hyper_basis)[0], hyper_basis)).reshape((4*d**2, 1))
+                single_bell = make_bell_single(d, c, p).reshape((4*d**2, 1))
+
+                print(np.isclose(converted_bell, single_bell, atol = 1e-10).all())
+
     d = 4
+    # check_bell_func_agree(d)
+
     results, resid_ls = find_trans_all(4)
     print(results)
     print(resid_ls)
 
-    # convert to single particle basis
-    single_particle_results = get_single_particle(results, d)
+    # factorize_tucker(results, d, save_latex=True)
+    # factorize_svd(results, d, save_latex=True)
+    factorize_gd(results, d, alpha=.1, verbose=True, save_latex=True)
+    # print(hosvd(results))
+
+
+
+    # # convert to single particle basis
+    # single_particle_results = get_single_particle(results, d)
+
+    
+
+
+
+           
+            
 
     # factor into tensor product of U_L and U_R
     # print(factorize_tensor(results, d))
@@ -269,12 +425,12 @@ if __name__ == '__main__':
 
     ## ----------- testing ----------- ##
     # print(get_single_particle(make_bell(d, 1, 2), d))
-    c = 0
-    p = 0
+    # c = 0
+    # p = 0
 
-    hyper_basis = make_hyperentangled_basis(2)
-    print(get_single_particle(make_bell(d, c, p)))
-    print(get_single_particle(reconstruct_bell(find_trans_one(c, p, hyper_basis)[0], hyper_basis)))
+    # hyper_basis = make_hyperentangled_basis(2)
+    # print(get_single_particle(make_bell(d, c, p)))
+    # print(get_single_particle(reconstruct_bell(find_trans_one(c, p, hyper_basis)[0], hyper_basis)))
     # print('here')
     # print('------')
     # print(make_bell(4, 0, 1))
