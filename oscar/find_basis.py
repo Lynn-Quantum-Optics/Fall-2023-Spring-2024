@@ -5,9 +5,14 @@ import pandas as pd
 from tensorly.decomposition import tucker
 from tensorly.tenalg import multi_mode_dot
 from scipy.optimize import minimize, approx_fprime
+from multiprocessing import Pool, Value, cpu_count
+import ctypes
+from tqdm import trange
+from math import factorial
+np.set_printoptions(threshold=np.inf)
 
 ## define bell states for given d in joint-particle basis ##
-def make_bell(d, c, p):
+def make_bell(d, c, p, b=True):
     '''Makes single bell state of correlation class c and phase class c.
     Parameters:
     d (int): dimension of system
@@ -24,20 +29,20 @@ def make_bell(d, c, p):
         index = d*j + gamma
         j_vec[index] = 1
 
-        # # add symmetric/antisymmetric part
-        # if b:
-        #     sym_index = d*gamma + j
-        #     j_vec[sym_index] = 1
-        # else:
-        #     asym_index = d*gamma + j
-        #     j_vec[asym_index] = -1
+        # add symmetric/antisymmetric part
+        if b:
+            sym_index = d*gamma + j
+            j_vec[sym_index] = 1
+        else:
+            asym_index = d*gamma + j
+            j_vec[asym_index] = -1
 
         result += np.exp(2*np.pi*1j*j*p/d) * j_vec
 
-    result /= np.sqrt(d)
+    result /= np.linalg.norm(result)
     return result
 
-def make_bell_single(d, c, p):
+def make_bell_single(d, c, p, b):
     '''Makes single bell state of correlation class c and phase class c.
     Parameters:
     d (int): dimension of system
@@ -55,7 +60,13 @@ def make_bell_single(d, c, p):
 
         result += np.exp(2*np.pi*1j*j*p/d) * np.kron(j_vec, gamma_vec)
 
-    result /= np.sqrt(d)
+    # add symmetric/antisymmetric part
+    if b:
+        result += np.exp(2*np.pi*1j*j*p/d)* np.kron(gamma_vec, j_vec)
+    else:
+        result -= np.exp(2*np.pi*1j*j*p/d) * np.kron(gamma_vec, j_vec)
+
+    result /= np.linalg.norm(result)
     return result
 
 ## for loss function to minimize ##
@@ -89,7 +100,7 @@ def find_trans_one(c, p, hyper_basis, d=4, alpha=0.0001):
     resid = np.linalg.norm(bell - hyper_basis @ coeffs)
     return coeffs, resid
 
-def find_trans_all(d=4):
+def find_trans_all(d=4, b=True):
     '''Returns matrix for expression for all d = 4 bell states in terms of hyperentangled basis'''
     hyper_basis = make_hyperentangled_basis(int(np.sqrt(d)))
     results = np.zeros((d**2, d**2), dtype=complex)
@@ -105,17 +116,126 @@ def find_trans_all(d=4):
             j+=1
     
     # round resulting matrix
-    np.save(f'local_transform/transformation_matrix_joint_{d}.npy', results)
+    np.save(f'local_transform/transformation_matrix_joint_{d}_{b}.npy', results)
 
-    results = np.round(results, 10)
-    results_pd = pd.DataFrame(results)
-    results_pd.to_csv(f'local_transform/transformation_matrix_joint_{d}.csv')
+    # convert to joint particle basis
+    results_joint = hyper_basis @ results @ hyper_basis.conj().T
+    results_joint = np.round(results_joint, 10)  
 
-    with open(f'local_transform/transformation_matrix_joint_{d}_latex.txt', 'w') as f:
-        f.write(np_to_latex(results))
+    results_pd = pd.DataFrame(results_joint)
+    results_pd.to_csv(f'local_transform/transformation_matrix_joint_{d}_{b}.csv')
 
-    return results, resid_ls
+    with open(f'local_transform/transformation_matrix_joint_{d}_{b}latex.txt', 'w') as f:
+        f.write(np_to_latex(results_joint))
 
+    # do the same but using the single particle basis
+    results_single = get_single_particle(hyper_basis) @ results @ get_single_particle(hyper_basis).conj().T
+
+    print('single', get_single_particle(hyper_basis))
+
+    results_single = np.round(results_single, 10)
+    results_pd = pd.DataFrame(results_single)
+    results_pd.to_csv(f'local_transform/transformation_matrix_single_{d}_{b}.csv')
+
+    with open(f'local_transform/transformation_matrix_single_{d}_{b}_latex.txt', 'w') as f:
+        f.write(np_to_latex(results_single))
+
+    return results_joint, resid_ls
+
+def check_if_factorable(C, verbose=False):
+    '''Checks if matrix is factorable into tensor product of two matrices by seeing if the 4x4 blocks are scalar multiples of each other.'''
+    d = int(np.sqrt(C.shape[0]))
+
+    shape = C.shape
+    block_mat = np.zeros((d**2, d**2), dtype=complex)
+    k = 0
+    for i in range(0, shape[0], d):
+        for j in range(0, shape[1], d):
+            blocks = C[i:i+d, j:j+d]
+            # convert each block to a vector
+            # add as column to block_mat
+            block_mat[:, k] = blocks.reshape((d**2))
+            k+=1
+
+    rank = get_rank(block_mat)
+    if verbose:
+        print(f'Rank of block matrix: {rank}')
+    return rank == 1
+
+def nth_permutation(elements, n):
+    '''
+    Generate the n-th permutation of the elements using the Factorial Number System.
+
+    Params:
+    elements (list): The list of elements to permute
+    n (int): The index of the permutation to generate
+    '''
+    sequence = list(elements)  # copy the original sequence
+    permutation = []
+    k = len(elements)
+    factoradic = [0] * k  # initialize factoradic representation as list of 0s
+    
+    # compute factorial representation of n
+    for i in range(1, k+1): # start indexing at 1 to avoid division by 0
+        n, remainder = divmod(n, i)
+        factoradic[-i] = remainder
+
+    # build the permutation
+    for factorial_index in factoradic:
+        permutation.append(sequence.pop(factorial_index)) # add as we remove the element
+
+    return permutation
+
+def permute_all(C):
+    ''''Permute all rows and columns of C and check if it is factorable.'''
+    # get the number of rows and columns
+    n_rows, n_cols = C.shape
+
+    # set exit flag so if we find a factorization we can exit
+    exit_flag = Value(ctypes.c_bool, False)
+
+    # now we'll generate all the permuted matrices
+    # need to parallelize this
+    def process_permutation(jk):
+        j, k = jk
+        j_perm = nth_permutation(range(n_rows), j)
+        k_perm = nth_permutation(range(n_cols), k)
+        # apply the row permutation
+        row_permuted_matrix = C[np.array(j_perm), :]
+        # apply the column permutation
+        permuted_matrix = row_permuted_matrix[:, np.array(k_perm)]
+        is_factorable = check_if_factorable(permuted_matrix)
+        if is_factorable:
+            print(f'Found factorization for j = {j}, k = {k}!')
+            with open(f'local_transform/permuted_matrix_{n_rows}_{n_cols}_{j}_{k}.txt', 'w') as f:  
+                # write permuted_matrix to file
+                f.write('row permutation:\n')
+                f.write(str(j))
+                f.write('\n')
+                f.write('column permutation:\n')
+                f.write(str(k))
+                f.write('\n')
+                f.write('permuted matrix:\n')
+                f.write(np_to_latex(permuted_matrix))
+            exit_flag.value = True
+        return is_factorable
+
+    # get the number of rows and columns
+    n_rows, n_cols = C.shape
+
+    # create a list of arguments for each permutation
+    print('Generating arguments')
+    args = [(j, k) for j in range(factorial(n_rows)) for k in range(factorial(n_cols))]
+
+    print('Starting multiprocessing')
+
+    # create a multiprocessing Pool with as many processes as there are CPUs
+    with Pool(cpu_count()) as p:
+        # use apply_async to apply the function asynchronously
+        results = [p.apply_async(process_permutation, (arg,)) if not exit_flag.value else None for arg in args]
+        # use get to retrieve the results
+        results = [result.get() if result is not None else None for result in results]
+            
 # function to convert to single particle basis #
 # single particle basis is { |0, L>,  |1, L>,  |d-1, L>, |0, R>, |1, R>, |d-1, R> }
 def get_single_particle(results, d=4, in_type='coeffs'):
@@ -126,11 +246,12 @@ def get_single_particle(results, d=4, in_type='coeffs'):
     in_type (str): whether we're dealing with special case of coefficient matrix or just some arbitrary bell state
     '''
     results_shape = results.shape
+    print(results_shape)
     # make single particle basis
     single_particle_results = np.zeros((4*d**2, results_shape[1]), dtype=complex)
     
     if results_shape[1] > 1:
-        for j in range(d**2):
+        for j in range(results_shape[1]):
             # convert column to single particle basis
             col = results[:, j]
             col_single = np.zeros((4*d**2, 1), dtype=complex)
@@ -149,6 +270,8 @@ def get_single_particle(results, d=4, in_type='coeffs'):
                     col_single += col[i]*np.kron(left_vec, right_vec)
             # append as column to single_particle_results
             single_particle_results[:, j] = col_single.reshape((4*d**2))
+        print(single_particle_results.shape)
+
         if in_type == 'coeffs':
             np.save(f'local_transform/transformation_matrix_single_{d}.npy', single_particle_results)
 
@@ -182,41 +305,28 @@ def get_single_particle(results, d=4, in_type='coeffs'):
 # ---- helper function to  convert output to bmatrix in latex ---- #
 def np_to_latex(array, precision=3):
     '''Converts a numpy array to a LaTeX bmatrix environment'''
-    def format_complex(c, precision):
-        '''Formats a complex number as a string'''
-        if not(np.isclose(c.real, 0)) and not(np.isclose(c.imag, 0)):
-            return format(c.real, f".{precision}f") + " + " + format(c.imag, f".{precision}f") + "i"
-        elif np.isclose(c.imag, 0) and not(np.isclose(c.real, 0)):
-            return format(c.real, f".{precision}f")
-        elif np.isclose(c.real, 0) and not(np.isclose(c.imag, 0)):
-            return format(c.imag, f".{precision}f") + "i"
+    def format_complex(num):
+        if num.imag == 0:
+            return f"{np.round(num.real, precision)}"
+        elif num.real == 0:
+            return f"{np.round(num.imag, precision)}i"
         else:
-            return "0"
-        
-    # get shape of array
-    shape = array.shape
-    print(shape)
+            # Format with a plus sign for the imaginary part if it's positive
+            return f"{np.round(num.real, precision)}+{np.round(num.imag, precision)}i"
 
-    if len(shape) == 2:
-        latex_str = "\\begin{bmatrix}\n"
-        for row in array:
-            row_str = " & ".join(format_complex(x, precision) for x in row)
-            latex_str += row_str + " \\\\\n"
-        latex_str += "\\end{bmatrix}"
+    # Generate the LaTeX bmatrix code from the complex matrix
+    latex_matrix_rows_complex = [
+        " & ".join(format_complex(num) for num in row) + " \\\\"
+        for row in array
+    ]
 
-    elif len(shape) == 4: # if tensor
-        latex_str = ""
-        for i in range(shape[0]):
-            for j in range(shape[1]):
-                latex_str += "\\begin{bmatrix}\n"
-                for k in range(shape[2]):
-                    row = array[i, j, k, :]
-                    row_str = " & ".join(format_complex(x, precision) for x in row)
-                    latex_str += row_str + " \\\\\n"
-                latex_str += "\\end{bmatrix}"
-                latex_str += ",\n"
-    return latex_str
-    
+    # Join all rows into a single string representing the entire bmatrix
+    latex_bmatrix_complex = "\\begin{bmatrix}\n" + "\n".join(latex_matrix_rows_complex) + "\n\\end{bmatrix}"
+
+    print(latex_bmatrix_complex)
+
+    return latex_bmatrix_complex
+
 
 # function to factor into tensor product of U_L and U_R #
 def get_rank(A):
@@ -386,9 +496,25 @@ if __name__ == '__main__':
                 print(np.isclose(converted_bell, single_bell, atol = 1e-10).all())
 
     d = 4
-    results, resid_ls = find_trans_all(4)
-    print(results)
-    print(resid_ls)
+    results, resid_ls = find_trans_all(4, b=True)
+    # results, resid_ls = find_trans_all(4, b=False)
+    # print(results)
+    # print(resid_ls)
+
+    permute_all(results)
+
+    # print(check_if_factorable(results, verbose=True))
+    # k_perm_ls = []
+    # for k in trange(factorial(4)):
+    #     k_perm = nth_permutation(range(4), k)
+    #     k_perm_ls.append(k_perm)
+    # print(k_perm_ls)
+    # print(len(set(tuple(x) for x in k_perm_ls)))
+    # print(factorial(4))
+
+    # print(permute_all(results))
+
+    # check_bell_func_agree(d)
 
     # factorize_tucker(results, d, save_latex=True)
     # factorize_gd(results, d, alpha=1, verbose=True, save_latex=True)

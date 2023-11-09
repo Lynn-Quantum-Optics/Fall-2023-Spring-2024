@@ -3,10 +3,10 @@
 import numpy as np
 from find_basis import * # for hyperentangled basis conversion
 
-def get_signature(d, U, c, p):
+def get_signature(d, U, c, p, b=True):
     '''Returns signature for a given d, U, c, p'''
     # make bell state
-    bell = make_bell_single(d, c, p)
+    bell = make_bell_single(d, c, p, b)
 
     # get signature
     assert U.shape[0] == 2*d, f'U must be 2d x 2d. Your shape is {U.shape}'
