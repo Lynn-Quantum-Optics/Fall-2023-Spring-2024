@@ -9,7 +9,9 @@ from multiprocessing import Pool, Value, cpu_count
 import ctypes
 from tqdm import trange
 from math import factorial
+
 np.set_printoptions(threshold=np.inf)
+exit_flag = None # global variable to exit multiprocessing
 
 ## define bell states for given d in joint-particle basis ##
 def make_bell(d, c, p, b=True):
@@ -92,7 +94,7 @@ def make_hyperentangled_basis(d=2):
 
     return hyper_basis
 
-def find_trans_one(c, p, hyper_basis, d=4, alpha=0.0001):
+def find_trans_one(c, p, hyper_basis, d=4):
     '''Finds local transformation for a d = 4 bell state given c, p with regularization'''
     # make bell state
     bell = make_bell(d, c, p)
@@ -142,16 +144,16 @@ def find_trans_all(d=4, b=True):
 
     return results_joint, resid_ls
 
-def check_if_factorable(C, verbose=False):
-    '''Checks if matrix is factorable into tensor product of two matrices by seeing if the 4x4 blocks are scalar multiples of each other.'''
-    d = int(np.sqrt(C.shape[0]))
+def check_if_factorable(alpha, verbose=False):
+    '''alphahecks if matrix is factorable into tensor product of two matrices by seeing if the 4x4 blocks are scalar multiples of each other.'''
+    d = int(np.sqrt(alpha.shape[0]))
 
-    shape = C.shape
+    shape = alpha.shape
     block_mat = np.zeros((d**2, d**2), dtype=complex)
     k = 0
     for i in range(0, shape[0], d):
         for j in range(0, shape[1], d):
-            blocks = C[i:i+d, j:j+d]
+            blocks = alpha[i:i+d, j:j+d]
             # convert each block to a vector
             # add as column to block_mat
             block_mat[:, k] = blocks.reshape((d**2))
@@ -186,60 +188,75 @@ def nth_permutation(elements, n):
 
     return permutation
 
-def permute_all(C):
-    ''''Permute all rows and columns of C and check if it is factorable.'''
+ # need to parallelize this
+def process_permutation(args):
+    j, k, n_rows, n_cols, alpha, _exit_flag = args
+
+    global exit_flag
+    exit_flag = _exit_flag
+
+    j_perm = nth_permutation(range(n_rows), j)
+    k_perm = nth_permutation(range(n_cols), k)
+    # apply the row permutation
+    row_permuted_matrix = alpha[np.array(j_perm), :]
+    # apply the column permutation
+    permuted_matrix = row_permuted_matrix[:, np.array(k_perm)]
+    is_factorable = check_if_factorable(permuted_matrix)
+    if is_factorable:
+        print(f'Found factorization for j = {j}, k = {k}!')
+        with open(f'local_transform/permuted_matrix_{n_rows}_{n_cols}_{j}_{k}.txt', 'w') as f:  
+            # write permuted_matrix to file
+            f.write('row permutation:\n')
+            f.write(str(j))
+            f.write('\n')
+            f.write('column permutation:\n')
+            f.write(str(k))
+            f.write('\n')
+            f.write('permuted matrix:\n')
+            f.write(np_to_latex(permuted_matrix))
+        exit_flag = True
+    return is_factorable
+
+def permute_all(alpha, beta = None, n_se = None):
+    ''''Permute all rows and columns of alpha and check if it is factorable.
+
+    Params:
+    alpha (np.array): matrix to permute
+    beta (float): proportion of total permutations to try if less than 1 
+    n_se (tuple): [lower bound, upper bound] for index of permutation to try; can be used in place of beta and vice versa
+    '''
     # get the number of rows and columns
-    n_rows, n_cols = C.shape
+    n_rows, n_cols = alpha.shape
 
     # set exit flag so if we find a factorization we can exit
-    exit_flag = Value(ctypes.c_bool, False)
+    global exit_flag
+
 
     # now we'll generate all the permuted matrices
-    # need to parallelize this
-    def process_permutation(jk):
-        j, k = jk
-        j_perm = nth_permutation(range(n_rows), j)
-        k_perm = nth_permutation(range(n_cols), k)
-        # apply the row permutation
-        row_permuted_matrix = C[np.array(j_perm), :]
-        # apply the column permutation
-        permuted_matrix = row_permuted_matrix[:, np.array(k_perm)]
-        is_factorable = check_if_factorable(permuted_matrix)
-        if is_factorable:
-            print(f'Found factorization for j = {j}, k = {k}!')
-            with open(f'local_transform/permuted_matrix_{n_rows}_{n_cols}_{j}_{k}.txt', 'w') as f:  
-                # write permuted_matrix to file
-                f.write('row permutation:\n')
-                f.write(str(j))
-                f.write('\n')
-                f.write('column permutation:\n')
-                f.write(str(k))
-                f.write('\n')
-                f.write('permuted matrix:\n')
-                f.write(np_to_latex(permuted_matrix))
-            exit_flag.value = True
-        return is_factorable
 
     # get the number of rows and columns
-    n_rows, n_cols = C.shape
+    n_rows, n_cols = alpha.shape
 
     # create a list of arguments for each permutation
-    print('Generating arguments')
-    args = [(j, k) for j in range(factorial(n_rows)) for k in range(factorial(n_cols))]
+    print('Generating arguments.....')
+    if beta is not None:
+        args = [(j, k, n_rows, n_cols, alpha, exit_flag) for j in range(factorial(n_rows)) for k in range(int(beta*factorial(n_cols)))]
+    elif n_se is not None:
+        args = [(j, k, n_rows, n_cols, alpha, exit_flag) for j in range(n_se[0], n_se[1]) for k in range(n_se[0], n_se[1])]
 
-    print('Starting multiprocessing')
+    print('Starting multiprocessing.....')
 
-    # create a multiprocessing Pool with as many processes as there are CPUs
+    # create a multiprocessing Pool with as many processes as there are alphaPUs
     with Pool(cpu_count()) as p:
         # use apply_async to apply the function asynchronously
-        results = [p.apply_async(process_permutation, (arg,)) if not exit_flag.value else None for arg in args]
+        results = [p.apply_async(process_permutation, (arg,)) if not exit_flag  else None for arg in args]
         # use get to retrieve the results
         results = [result.get() if result is not None else None for result in results]
             
 # function to convert to single particle basis #
 # single particle basis is { |0, L>,  |1, L>,  |d-1, L>, |0, R>, |1, R>, |d-1, R> }
 def get_single_particle(results, d=4, in_type='coeffs'):
-    '''Converts coefficient matrix from hyperentangled basis to single particle basis in the big d system.
+    '''alphaonverts coefficient matrix from hyperentangled basis to single particle basis in the big d system.
     Params:
     results (np.array): matrix of in standard basis
     d (int): dimension of system
@@ -304,7 +321,7 @@ def get_single_particle(results, d=4, in_type='coeffs'):
 
 # ---- helper function to  convert output to bmatrix in latex ---- #
 def np_to_latex(array, precision=3):
-    '''Converts a numpy array to a LaTeX bmatrix environment'''
+    '''alphaonverts a numpy array to a LaTeX bmatrix environment'''
     def format_complex(num):
         if num.imag == 0:
             return f"{np.round(num.real, precision)}"
@@ -330,13 +347,13 @@ def np_to_latex(array, precision=3):
 
 # function to factor into tensor product of U_L and U_R #
 def get_rank(A):
-    '''Checks rank of matrix'''
+    '''alphahecks rank of matrix'''
     return np.linalg.matrix_rank(A)
 
-def factorize_tucker(C, d, save_latex = False):
+def factorize_tucker(alpha, d, save_latex = False):
     '''Factor a d^2 x d^2 matrix into a tensor product of two d x d matrices.'''
-    # reshape C into a tensor of shape (d, d, d, d)
-    tensor = C.reshape(d, d, d, d)
+    # reshape alpha into a tensor of shape (d, d, d, d)
+    tensor = alpha.reshape(d, d, d, d)
 
     # perform Tucker decomposition on the tensor
     core, factors = tucker(tensor, rank=[d, d, d, d])
@@ -349,14 +366,14 @@ def factorize_tucker(C, d, save_latex = False):
     print(A.shape)
     print(B.shape)
 
-    # reconstruct C from the factors and reshape from (d,d,d,d) tensor back to (d^2, d^2) matrix
-    C_recon  = multi_mode_dot(core, factors, modes=[0, 1, 2, 3])
+    # reconstruct alpha from the factors and reshape from (d,d,d,d) tensor back to (d^2, d^2) matrix
+    alpha_recon  = multi_mode_dot(core, factors, modes=[0, 1, 2, 3])
 
-    C_recon = C_recon.reshape(d**2, d**2)
+    alpha_recon = alpha_recon.reshape(d**2, d**2)
 
-    print(np.isclose(C, C_recon, atol=1e-10).all())
+    print(np.isclose(alpha, alpha_recon, atol=1e-10).all())
 
-    diff_norm = np.linalg.norm(C - C_recon)
+    diff_norm = np.linalg.norm(alpha - alpha_recon)
     print(diff_norm)
 
     if save_latex:
@@ -367,11 +384,11 @@ def factorize_tucker(C, d, save_latex = False):
             f.write('B:\n')
             f.write(np_to_latex(B))
             f.write('--------------------\n')
-            f.write('Core tensor:\n')
+            f.write('alphaore tensor:\n')
             f.write(np_to_latex(core))
             f.write('--------------------\n')
-            f.write('C_recon:\n')
-            f.write(np_to_latex(C_recon))
+            f.write('alpha_recon:\n')
+            f.write(np_to_latex(alpha_recon))
             f.write('--------------------\n')
             f.write('Norm of difference:\n')
             f.write(str(diff_norm))
@@ -380,7 +397,7 @@ def factorize_tucker(C, d, save_latex = False):
             
     return A, B
 
-def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e-4, verbose = False, save_latex=False):
+def factorize_gd(alpha,d, lr = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e-4, verbose = False, save_latex=False):
     '''Factorize a d^2 x d^2 matrix into a tensor product of two d x d matrices using gradient descent'''
 
     def random():
@@ -404,7 +421,7 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
     def get_loss(coeff):
         '''Loss function to minimize'''
         U_L, U_R = construct_Us(coeff)
-        return np.linalg.norm(C - np.kron(U_L, U_R))
+        return np.linalg.norm(alpha - np.kron(U_L, U_R))
     
     def minimize_loss(coeff):
         result = minimize(get_loss, coeff, method='Nelder-Mead')
@@ -422,7 +439,7 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
     while n < max_iter and best_loss > loss_thres:
         if verbose:
             print(f'Iteration {n}')
-            print(f'Current loss: {loss}')
+            print(f'alphaurrent loss: {loss}')
             print(f'Best loss: {best_loss}')
             print(f'Index since improvement: {index_since_improvement}')
             print('-------------------')
@@ -435,7 +452,7 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
             gradient = approx_fprime(grad_coeff, get_loss, epsilon=1e-8) # epsilon is step size in finite difference
 
             # update angles
-            coeff = grad_coeff - alpha*gradient
+            coeff = grad_coeff - lr*gradient
             grad_coeff = coeff
 
         # update loss
@@ -456,23 +473,23 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
     print(U_L.shape)
     print(U_R.shape)
 
-    C_recon = np.kron(U_L, U_R)
+    alpha_recon = np.kron(U_L, U_R)
 
-    print(np.isclose(C, C_recon, atol=1e-10).all())
+    print(np.isclose(alpha, alpha_recon, atol=1e-10).all())
 
     diff_norm = best_loss
     print(best_loss)
 
     if save_latex:
-        with open(f'local_transform/gd_factorization_{d}_{alpha}_latex.txt', 'w') as f:
+        with open(f'local_transform/gd_factorization_{d}_{lr}_latex.txt', 'w') as f:
             f.write('U_L:\n')
             f.write(np_to_latex(U_L))
             f.write('--------------------\n')
             f.write('U_R:\n')
             f.write(np_to_latex(U_R))
             f.write('--------------------\n')
-            f.write('C_recon:\n')
-            f.write(np_to_latex(C_recon))
+            f.write('alpha_recon:\n')
+            f.write(np_to_latex(alpha_recon))
             f.write('--------------------\n')
             f.write('Norm of difference:\n')
             f.write(str(diff_norm))
@@ -481,7 +498,7 @@ def factorize_gd(C,d, alpha = 0.1, frac = 0.01, max_iter = 1000, loss_thres = 1e
             f.write(str(n))
             f.write('--------------------\n')
             f.write('Learning rate:\n')
-            f.write(str(alpha))
+            f.write(str(lr))
 
 if __name__ == '__main__':
     def check_bell_func_agree(d):
@@ -501,7 +518,7 @@ if __name__ == '__main__':
     # print(results)
     # print(resid_ls)
 
-    permute_all(results)
+    permute_all(results, n_se=[0, 100]) # ~ 20 million permutations
 
     # print(check_if_factorable(results, verbose=True))
     # k_perm_ls = []
@@ -517,7 +534,7 @@ if __name__ == '__main__':
     # check_bell_func_agree(d)
 
     # factorize_tucker(results, d, save_latex=True)
-    # factorize_gd(results, d, alpha=1, verbose=True, save_latex=True)
+    # factorize_gd(results, d, lr=1, verbose=True, save_latex=True)
 
 
 
