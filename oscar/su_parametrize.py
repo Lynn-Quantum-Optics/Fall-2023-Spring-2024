@@ -4,107 +4,105 @@
 import numpy as np
 import sympy as sp
 import scipy
+from functools import partial
 from scipy.optimize import shgo, basinhopping
 from math import comb
 from tqdm import trange
 from bell import make_bell, CNS, num_overlapping
+import numpy as np
+import scipy.linalg
 
-# define the pauli matrices
-Sx = np.array([[0, 1], [1, 0]], dtype = complex)
-Sy = np.array([[0, -1j], [1j, 0]], dtype = complex)
-Sz = np.array([[1, 0], [0, -1]], dtype = complex)
-I2 = np.eye(2, dtype = complex)
-# define gell mann matrices
-L1 = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 0]], dtype = complex)
-L2 = np.array([[0, -1j, 0], [1j, 0, 0], [0, 0, 0]], dtype = complex)
-L3 = np.array([[1, 0, 0], [0, -1, 0], [0, 0, 0]], dtype = complex)
-L4 = np.array([[0, 0, 1], [0, 0, 0], [1, 0, 0]], dtype = complex)
-L5 = np.array([[0, 0, -1j], [0, 0, 0], [1j, 0, 0]], dtype = complex)
-L6 = np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0]], dtype = complex)
-L7 = np.array([[0, 0, 0], [0, 0, -1j], [0, 1j, 0]], dtype = complex)
-L8 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, -2]], dtype = complex) / np.sqrt(3)
-# define the identity matrix
-I3 = np.eye(3, dtype = complex)
+## ----------- parametrizing SU(n) ----------- #
+# helper function to check if valid matrix #
+def is_hermitian(matrix, tol=1e-10):
+    '''Checks if a matrix is Hermitian.'''
+    return np.allclose(matrix, matrix.conj().T, atol=tol)
 
-def su_2(alpha_1, alpha_2, alpha_3):
-    '''expresses a 2x2 unitary matrix as a linear combination of the pauli matrices'''
-    # alpha_1, alpha_2, alpha_3 are the coefficients of the pauli matrices and are real
-    assert np.isreal(alpha_1) and np.isreal(alpha_2) and np.isreal(alpha_3)
-    anti_hermitian = 1j * (alpha_1*Sx + alpha_2*Sy + alpha_3*Sz)
+def is_traceless(matrix, tol=1e-10):
+    '''Checks if a matrix is traceless.'''
+    return np.isclose(np.trace(matrix), 0, atol=tol)
 
-    # Exponential map to SU(2)
-    return scipy.linalg.expm(anti_hermitian)
+def is_unitary(matrix, tol=1e-10):
+    '''Checks if a matrix is unitary.'''
+    return np.allclose(matrix @ matrix.conj().T, np.eye(matrix.shape[0]), atol=tol)
 
-def su_3(beta_1, beta_2, beta_3, beta_4, beta_5, beta_6, beta_7, beta_8):
-    '''expresses a 3x3 unitary matrix as a linear combination of the gell mann matrices'''
-    # beta_1, beta_2, beta_3, beta_4, beta_5, beta_6, beta_7, beta_8 are the coefficients of the gell mann matrices and are real
-    assert np.isreal(beta_1) and np.isreal(beta_2) and np.isreal(beta_3) and np.isreal(beta_4) and np.isreal(beta_5) and np.isreal(beta_6) and np.isreal(beta_7) and np.isreal(beta_8)
-    # need to normalize the coefficients
-    # find the norm of the vector (beta_1, beta_2, beta_3, beta_4, beta_5, beta_6, beta_7, beta_8)
-    n = np.array([beta_1, beta_2, beta_3, beta_4, beta_5, beta_6, beta_7, beta_8])
-    norm = np.linalg.norm(n)
-    # normalize the vector
-    n /= norm
-    return scipy.linalg.expm(1j*(n[0]*L1 + n[1]*L2 + n[2]*L3 + n[3]*L4 + n[4]*L5 + n[5]*L6 + n[6]*L7 + n[7]*L8))
+def is_det1(matrix, tol=1e-10):
+    '''Checks if a matrix has determinant 1.'''
+    return np.isclose(np.linalg.det(matrix), 1, atol=tol)
 
-def get_U(d):
-    '''returns the function to get U parametrized by the coefficients of the pauli and gell mann matrices'''
-    # fitting for a 4*d^2 unitary matrix in single
-    # factor 4*d^2 into 2^n * 3^m
-    # find n and m
-    n = 0
-    m = 0
-    size = 2*d
-    while size % 2 == 0:
-        n += 1
-        size /= 2
-    size = 2*d
-    while size % 3 == 0:
-        m += 1
-        size /= 3
+def is_param_valid(n):
+    '''Checks if a the param process yields a valid SU(n) matrix by checking the generator construction and unitarity of final product and det 1'''
+    
+    # check if the matrix is hermitian and traceless
+    generators = get_su_n_generators(n)
+    for i, g in enumerate(generators):
+        assert is_hermitian(g), f'Generator {i} is not Hermitian'
+        assert is_traceless(g), f'Generator {i} is not traceless'
 
-    # find the function for the unitary matrix
-    # get n sets of 3 parameters for the pauli matrices
-    # get m sets of 8 parameters for the gell mann matrices
-    # create a dictionary
-    def U(n, m, param_vals):
-        '''returns the unitary matrix for given parameter values'''
-        param_dict = {}
-        for i in range(n):
-            for j in range(3):
-                param_dict[f'alpha_{i+1}_{j+1}'] = param_vals[3*i + j]
-        for i in range(m):
-            for j in range(8):
-                param_dict[f'beta_{i+1}_{j+1}'] = param_vals[3*n + 8*i + j]
+    # generate a random SU(n) matrix
+    params = np.random.random(len(generators))
+    U = get_su_n(params, generators)
 
-        # create the unitary matrix
-        if n > 0:
-            for i in range(n):
-                if i == 0:
-                    U = su_2(param_dict[f'alpha_{i+1}_1'], param_dict[f'alpha_{i+1}_2'], param_dict[f'alpha_{i+1}_3'])
-                else:
-                    U = np.kron(U, su_2(param_dict[f'alpha_{i+1}_1'], param_dict[f'alpha_{i+1}_2'], param_dict[f'alpha_{i+1}_3']))
-        if m > 0:
-            for i in range(m):
-                if i == 0 and n == 0:
-                    U = su_3(param_dict[f'beta_{i+1}_1'], param_dict[f'beta_{i+1}_2'], param_dict[f'beta_{i+1}_3'], param_dict[f'beta_{i+1}_4'], param_dict[f'beta_{i+1}_5'], param_dict[f'beta_{i+1}_6'], param_dict[f'beta_{i+1}_7'], param_dict[f'beta_{i+1}_8'])
-                else:
-                    U = np.kron(U, su_3(param_dict[f'beta_{i+1}_1'], param_dict[f'beta_{i+1}_2'], param_dict[f'beta_{i+1}_3'], param_dict[f'beta_{i+1}_4'], param_dict[f'beta_{i+1}_5'], param_dict[f'beta_{i+1}_6'], param_dict[f'beta_{i+1}_7'], param_dict[f'beta_{i+1}_8']))
+    # check if U is unitary
+    assert is_unitary(U), 'U is not unitary'
+    assert is_det1(U), 'U does not have determinant 1'
 
-        return U
-        
-    return U, n, m
+    return is_unitary(U) and is_det1(U)
 
-def find_params(d):
-    '''finds the optimal params to generate the unitary matrix'''
-    # get the function to get the unitary matrix
-    U, n, m = get_U(d)
-    num_params = 3*n + 8*m
+def is_valid_SU_n(U):
+    '''Confirms that matrix U is a valid SU(n) matrix.'''
+    return is_unitary(U) and is_det1(U)
+
+def get_su_n_generators(n):
+    '''Returns the generators of the su(n) Lie algebra.'''
+    generators = []
+
+    # add n-1 diagonal generators
+    for i in range(1, n):
+        diag_matrix = np.zeros((n, n), dtype=complex)
+        diag_matrix[i, i] = 1
+        diag_matrix[i-1, i-1] = -1
+        generators.append(diag_matrix)
+
+    # add off-diagonal generators
+    for i in range(n):
+        for j in range(i + 1, n):
+            real_matrix = np.zeros((n, n), dtype=complex)
+            real_matrix[i, j] = real_matrix[j, i] = 1
+            generators.append(real_matrix)
+
+            imag_matrix = np.zeros((n, n), dtype=complex)
+            imag_matrix[i, j] = -1j
+            imag_matrix[j, i] = 1j
+            generators.append(imag_matrix)
+
+    return generators
+
+def get_SU_n(params, generators):
+    '''Exponentiates a linear combination of the generators of su(n).'''
+    params = np.array(params)
+    generator_sum = sum(p * g for p, g in zip(params, generators))
+    # print(type(params[0])=='numpy.float64')
+    # if type(params[0]) == 'numpy.float64':
+    return scipy.linalg.expm(1j*generator_sum)
+    # else:
+        # return sp.Matrix(1j*generator_sum).exp()
+
+def find_params(d, numerical=True):
+    '''finds the optimal params to generate the unitary matrix.
+
+    Params:
+        d (int): dimension of the unitary matrix
+        numerical (bool): whether to use numerical optimization or sympy
+    '''
+    # get the function to get the unitary matrix, 2d x 2d
+    generators = get_su_n_generators(2*d)
+    U = partial(get_SU_n, generators=generators)
+    num_params = len(generators)
 
     # starting at k = d, find largest group of k bell states such that when we apply U^{-1} \otimes U^{-1} to the bell states, we get non overlapping detection signatures
     # we start with a particular k and see if we can find a group of k bell states that work; if so, increase k by 1 and repeat
     # if not, we have found the largest group of bell states that works
-
     def N(param_vals, k, i):
         '''returns the number of overlapping detection signatures for a given index of C(d^2, k) bell states'''
         # get the k-tuple
@@ -116,11 +114,14 @@ def find_params(d):
             c = state_num // d
             p = state_num % d
             # get the bell state and append as a column vector
-            bell_states[:,j] = make_bell(d, c, p, b=True, options='only_first', joint=False).reshape(4*d**2)
+            bell_states[:,j] = make_bell(d, c, p, b=True, options='none', joint=False).reshape(4*d**2)
+            # print('(c, p)', (c, p))
+            # print(bell_states[:, j])
             j+=1
-        # print(bell_states)
+        # print('bell_states', bell_states)
         # apply U  = \mathcal{U}^{-1} \otimes \mathcal{U}^{-1} to the bell states
-        U_inv = U(n, m, param_vals).conj().T
+        # print(type(param_vals[0]))
+        U_inv = U(param_vals).conj().T
         U_tot = np.kron(U_inv, U_inv)
         bell_proj = U_tot @ bell_states
         return num_overlapping(bell_proj)
@@ -133,21 +134,30 @@ def find_params(d):
         # if we get through all combinations without returning False, return True
 
         for i in trange(comb(d**2, k)):
+            if numerical:
            # solve for the param_vals that make N = 0
-            x0 = [0 for i in range(num_params)]
-            # define a callback function to print the progress of the optimization
-
-            # basinhopping
-            result = basinhopping(func=N, x0=x0, minimizer_kwargs={"args": (k, i)}, niter=100, disp=False)
-            # call shgo to find the minimum
-            # result = shgo(func=N, args = (k, i), bounds = [(-np.pi, np.pi) for i in range(num_params)])
-
-            print(U(n, m, result.x))
-            print(U(n, m, result.x).shape)
-            print(result.x)
-            print(result.fun)
-            if np.isclose(result.fun, 1e-10):
-                return True
+                x0 = [0 for _ in range(num_params)]
+                # altnerate 0 and 1
+                # x0 = [0 if i % 2 == 0 else 1 for i in range(num_params)]
+                print('initial guess', x0)
+                # define a callback function to print the progress of the optimization
+                # basinhopping
+                result = basinhopping(func=N, x0=x0, minimizer_kwargs={"args": (k, i)}, niter=1000, disp=False)
+                # call shgo to find the minimum
+                # result = shgo(func=N, args = (k, i), bounds = [(-1, 1) for _ in range(num_params)])
+                print(U(result.x))
+                print(U(result.x).shape)
+                print('min result', result.x)
+                print(result.fun)
+                if np.isclose(result.fun, 1e-10):
+                    return True
+            else:
+                # solve for the param_vals that make N = 0
+                param_vals = sp.symbols('p0:%d' % num_params)
+                result = sp.nsolve(N(param_vals, k, i), param_vals, [0 for _ in range(num_params)])
+                print(result)
+                if np.isclose(result, 0):
+                    return True
 
         # if we get through all combinations without returning False, return False
         return False             
@@ -160,7 +170,10 @@ def find_params(d):
         k += 1
 
 if __name__ == '__main__':
-    find_params(2)
+    find_params(2, numerical=True)
+
+
+    
 
    
 
