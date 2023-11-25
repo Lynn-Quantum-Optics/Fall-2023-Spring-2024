@@ -14,7 +14,6 @@ def make_bell(d, c, p, b=True, options = 'none', joint=True):
     options (str): whether to include symmetric/antisymmetric part term or both
     single (bool): whether to calculate in joint basis or joint
     '''
-
     if joint:
         result = np.zeros((d**2, 1), dtype=complex)
         for j in range(d):
@@ -84,13 +83,16 @@ def num_overlapping(vectors):
     '''
 
     # convert to binary
-    vectors = np.where(np.isclose(vectors, 0, rtol=1e-10), 0, 1)
+    # vectors = np.where(np.isclose(vectors, 0, rtol=1e-10), 0, 1)
     # print(vectors)
     # go through each vector and dot product with all other vectors
     num_overlapping = 0
     for i in range(vectors.shape[1]):
         for j in range(i+1, vectors.shape[1]):
-            num_overlapping += np.dot(vectors[:, i], vectors[:, j])
+            # print(f'i = {i}', vectors[:, i].T)
+            # print(f'j = {j}', vectors[:, j].T)  
+            # print(i, j, np.dot(np.abs(vectors[:, i]), np.abs(vectors[:, j])))
+            num_overlapping += np.dot(np.abs(vectors[:, i]), np.abs(vectors[:, j]))
     return num_overlapping
 
 def CNS(n, k, x):
