@@ -27,15 +27,17 @@ def check_entangled(bell, ret_val = False, display_val=False):
     # get reduced density matrix
     rho_reduced = np.zeros((d, d), dtype=complex)
 
+    Id = np.eye(d)
+
     # partial trace over the second subsystem
     for i in range(d):
         # projector for each basis state of the second subsystem
         basis_state = np.zeros(d)
         basis_state[i] = 1
-        projector = np.kron(basis_state, np.eye(d))
+        projector = np.kron(basis_state, Id)
 
         # add to reduced density matrix
-        rho_reduced += np.dot(np.dot(projector, rho), projector.T)
+        rho_reduced += projector @ rho @ projector.T
 
     # normalize!
     rho_reduced = np.trace(rho_reduced) * rho_reduced
@@ -244,84 +246,118 @@ def display_bell(bell):
         if b != 0:
             L = i // d
             R = i % d
+            # convert coeff to mag, angle
+            mag = np.abs(b[0]).real
+            phase = np.angle(b[0]).real
             if bell_str == '':
-                bell_str+=f'{np.round(b[0],3)} |{L}>|{R}>'
+                bell_str+=f'{mag}e^{phase}1j |{L}>|{R}>'
             else:
-                bell_str+=f'+ {np.round(b[0],3)} |{L}>|{R}>'
+                bell_str+=f'+ {mag}e^{phase}1j |{L}>|{R}>'
     return bell_str
 
-def make_entangled(bell):
+def convert_bell_str(bell_str, d):
+    '''Converts bell state in bra ket form to vector.'''
+    bell = np.zeros((d**2, 1), dtype=complex)
+    bell_str = bell_str.split('+')
+    for term in bell_str:
+        # split by space to get coeff and ket
+        term = term.split()
+        coeff = term[0]
+        # get rid of e^
+        if 'e' in coeff:
+            coeff = coeff.split('e^')
+            mag = float(coeff[0])
+            angle = float(coeff[1].split('j')[0])
+            coeff = mag*np.exp(angle * 1j)
+        ket_pair = term[1]
+        # get L and R values
+        ket_pair = ket_pair.split('>')
+        L = int(ket_pair[0][1:])
+        R = int(ket_pair[1][1:])
+        
+        # get index
+        index = L*d + R
+        bell[index] = coeff
+    return bell
+
+entanglement = partial(check_entangled, ret_val=True)
+symmet = partial(symmetric, ret_norm=True)
+
+def loss(x, bell):
+    bell = bell.reshape((d**2,))
+    # convert to full vector
+    vec = x[:d**2] + 1j*x[d**2:]
+    bell += vec
+    # normalize
+    bell /= np.linalg.norm(bell)
+    ent = entanglement(bell)
+    sym = symmet(bell)
+    ent_real = np.real(ent)
+    ent_imag = np.imag(ent)
+    targ_ent = 1/d
+    return (ent_real - targ_ent)**2 + (ent_imag)**2 + sym**2
+
+def make_entangled(bell, x0_ls = None):
     '''Uses GD to find the state we need to add to the bell state to make it fully entangled'''
     d = int(np.sqrt(len(bell)))
     bell = bell.reshape((d**2,))
     bell /= np.linalg.norm(bell)
-
-    entanglement = partial(check_entangled, ret_val=True)
-    symmet = partial(symmetric, ret_norm=True)
-
-    def loss(x, bell):
-        # convert to full vector
-        vec = x[:d**2] + 1j*x[d**2:]
-        bell += vec
-        ent = entanglement(bell)
-        sym = symmet(bell)
-        ent_real = np.real(ent)
-        ent_imag = np.imag(ent)
-        targ_ent = 1/d
-        return (ent_real - targ_ent)**2 + (ent_imag)**2 + sym**2
     
     def random_gen():
         '''Separate real and imaginary parts of vector and normalize'''
-        vec = np.concatenate([np.random.rand(d**2), + 1j*np.random.rand(d**2)])
+        vec = np.concatenate([np.random.rand(d**2), + np.random.rand(d**2)])
         combined_vec = vec[:d**2] + 1j*vec[d**2:]
         return vec/np.linalg.norm(combined_vec)
     
     # try to find solution
     loss_bell = partial(loss, bell=bell)
-    x_best, loss_best = trabbit(loss_bell, random_gen, verbose=True, frac=0.01, alpha=1.1, tol=1e-10)
+    x_best, loss_best = trabbit(loss_bell, random_gen, verbose=True, frac=0.01, alpha=.7, tol=1e-10, x0_ls=x0_ls)
     print(loss_best)
-    print(x_best)
+    print(list(x_best))
     return x_best
 
 
 if __name__ == '__main__':
     d = 4
-
     bell = bell_s(d, 3, 2)
-    x_best = make_entangled(bell)
 
-    # found one to 1e-6!
-#     1.439455219012125e-06
-# [ 1.33466454+0.j          0.07991565+0.j          1.02935334+0.j
-#   0.0366273 +0.j          0.05358747+0.j          1.49809086+0.j
-#   0.41675159+0.j          0.13737118+0.j          1.00378665+0.j
-#   0.413834  +0.j         -1.13016502+0.j          1.12790242+0.j
-#   0.04500242+0.j          0.1557045 +0.j          1.15604772+0.j
-#   0.88953439+0.j          0.13977298+0.56855612j  0.04592478+0.35555318j
-#   0.03116871+0.36767168j  0.02682425+0.32866123j  0.04411716+0.84818717j
-#   0.03743956+0.5903136j   0.03449962+0.82848295j  0.03551454+0.09278652j
-#   0.03277864+0.52779357j  0.03484632+0.4725063j   0.03543179+0.3985269j
-#   0.03604953+0.68849192j  0.02781067+0.32030142j  0.03556816+0.36482586j
-#   0.03580318+0.58050521j  0.03926356+0.7201627j ]
 
-#     x_best =  np.array([
-#     -0.39914514+0.j, 0.66802457+0.j, 0.37203545+0.j, -0.04055752+0.j, 
-#     0.16172204+0.j, -0.25811277+0.j, 0.59908882+0.j, -0.31932903+0.j, 
-#     -0.0760946 +0.j, -0.37229527+0.j, 0.40606246+0.j, 0.65354633+0.j, 
-#     0.68968878+0.j, 0.2965142 +0.j, 0.08393382+0.j, 0.16422431+0.j, 
-#     -0.03314695+0.21097571j, -0.00292451+0.03471294j, -0.02812834+0.34831972j, 
-#     -0.02904904+0.53232796j, -0.02018416+0.15073022j, -0.03323988+0.31055887j, 
-#     -0.02743774+0.55702722j, -0.03312472+0.05832004j, -0.04125797+0.07318349j, 
-#     -0.03802235+0.56537948j, -0.05016439+0.37928723j, -0.04993331+0.42466573j, 
-#     -0.0270885 +0.10596727j, -0.06731255+0.27162313j, -0.06944027+0.47743037j, 
-#     -0.05154533+0.3501594j
-# ]) # loss = 3.48e-07; not symmetric
+    # 2.178436944154104e-07
+    x_best = np.array([1.1997766718739271, 0.2907492336982105, 0.39058612525764613, -0.25800554800457315, 0.2907189484204616, 0.9062780259041427, -0.6162903349319176, 0.5123047254690065, 0.3905610806086528, -0.6163054806422082, -0.041125496512232865, 0.589393242091415, -0.2579983973239351, 0.5123126946718567, 0.589415047039367, -0.15156466406436406, 0.16378271096375777, -0.29319488806431654, 0.168736597332674, -0.33205964778452635, -0.2932049809147356, 0.10345587141750738, -0.28618211804482585, 0.3082520017570542, 0.16874070004525968, -0.28618116089140777, 0.34476755031744744, 0.8472527206234807, -0.3320591801345535, 0.30825506534625174, 0.8472623994986536, 0.44267075823579843])
+
+    print(f'loss: {loss(x_best, bell)}')
+    
+    x_best = make_entangled(bell, x0_ls=[x_best])
     
     corr = x_best[:d**2]+1j*x_best[d**2:]
     corr = corr.reshape((d**2, 1))
-    print('correction', display_bell(corr))
+    corr_str = display_bell(corr)
     bell_corr = bell + corr
-    print('is symmetric?', symmetric(bell_corr, display=True))
+    bell_corr /= np.linalg.norm(bell_corr)
+    print('actual xbest', check_entangled(bell_corr, display_val=True))
+
+
+
+    coeff_str = '0.4432427419467506e^0.135672382684276841j |0>|0>+ 0.15114436852118282e^-0.78958630396705731j |0>|1>+ 0.15574231179815554e^0.407792055538780731j |0>|2>+ 0.15392544651512838e^-2.2313456871371841j |0>|3>+ 0.15113918626738287e^-0.7896555971982711j |1>|0>+ 0.3338910271548267e^0.113662653137927031j |1>|1>+ 0.24872439401574603e^-2.7068592748368281j |1>|2>+ 0.21885424056587785e^0.54166605263735571j |1>|3>+ 0.15573449178174745e^0.40782425306561061j |2>|0>+ 0.24872927476010348e^-2.7068699399226141j |2>|1>+ 0.1270943457055362e^1.68952005508808181j |2>|2>+ 0.3777912053378135e^0.96299429478083921j |2>|3>+ 0.1539237054129368e^-2.23133294147367561j |3>|0>+ 0.21885731821629087e^0.54166357129468391j |3>|1>+ 0.3777986717123001e^0.96298230724144271j |3>|2>+ 0.17127097129382063e^1.90067283193149831j |3>|3>'
+
+    coeffs = coeff_str.split('+') # evaluate each term
+    coeff_tot = convert_bell_str(coeff_str, d)
+    for coeff in coeffs:
+        print(coeff)
+        coeff_vec = convert_bell_str(coeff, d)
+        bell_cor = bell + coeff_vec
+        bell_cor /= np.linalg.norm(bell_cor)
+        print(check_entangled(bell_cor, display_val=True))
+        print('-----')
+
+   
+    print(coeff_tot)
+    print('*~*~*~')
+    print(corr)
+    print('*~*~*~')
+    print(f'norm = {np.linalg.norm(coeff_tot - corr)}')
+
+   
 
 
     # print(check_entangled(bell_s(d, 3, 2), display_val=True))
@@ -339,3 +375,35 @@ if __name__ == '__main__':
     # check_all_bell(d, display_bell, bell_s)
     # print(check_all_entangled(d))
     # find_params(d, bell_s)
+
+
+
+
+    #     x_best =  np.array([
+#     -0.39914514+0.j, 0.66802457+0.j, 0.37203545+0.j, -0.04055752+0.j, 
+#     0.16172204+0.j, -0.25811277+0.j, 0.59908882+0.j, -0.31932903+0.j, 
+#     -0.0760946 +0.j, -0.37229527+0.j, 0.40606246+0.j, 0.65354633+0.j, 
+#     0.68968878+0.j, 0.2965142 +0.j, 0.08393382+0.j, 0.16422431+0.j, 
+#     -0.03314695+0.21097571j, -0.00292451+0.03471294j, -0.02812834+0.34831972j, 
+#     -0.02904904+0.53232796j, -0.02018416+0.15073022j, -0.03323988+0.31055887j, 
+#     -0.02743774+0.55702722j, -0.03312472+0.05832004j, -0.04125797+0.07318349j, 
+#     -0.03802235+0.56537948j, -0.05016439+0.37928723j, -0.04993331+0.42466573j, 
+#     -0.0270885 +0.10596727j, -0.06731255+0.27162313j, -0.06944027+0.47743037j, 
+#     -0.05154533+0.3501594j
+# ]) # loss = 3.48e-07; not symmetric
+
+
+    # found one to 1e-6!
+    # 1.439455219012125e-06
+    # x_best = np.array([ 
+    #     1.33466454+0.j, 0.07991565+0.j, 1.02935334+0.j, 0.0366273 +0.j, 
+    #     0.05358747+0.j, 1.49809086+0.j, 0.41675159+0.j, 0.13737118+0.j, 
+    #     1.00378665+0.j, 0.413834 +0.j, -1.13016502+0.j, 1.12790242+0.j, 
+    #     0.04500242+0.j, 0.1557045 +0.j, 1.15604772+0.j, 0.88953439+0.j, 
+    #     0.13977298+0.56855612j, 0.04592478+0.35555318j, 0.03116871+0.36767168j, 
+    #     0.02682425+0.32866123j, 0.04411716+0.84818717j, 0.03743956+0.5903136j, 
+    #     0.03449962+0.82848295j, 0.03551454+0.09278652j, 0.03277864+0.52779357j, 
+    #     0.03484632+0.4725063j, 0.03543179+0.3985269j, 0.03604953+0.68849192j, 
+    #     0.02781067+0.32030142j, 0.03556816+0.36482586j, 0.03580318+0.58050521j, 
+    #     0.03926356+0.7201627j 
+    # ])
