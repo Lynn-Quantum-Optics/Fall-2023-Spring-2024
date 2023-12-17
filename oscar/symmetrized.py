@@ -216,18 +216,24 @@ def check_all_bell(d, func = None, bell_gen_func = bell_us):
                 print(bell_gen_func(d, c, p), display_val=True)
             print('-----')
 
-def check_all_entangled(d, bell_gen_func = bell_s):
+def check_all_entangled(d, bell_gen_func = bell_s, odd_p = False):
     '''Performs the function func on each of the bell states for a given dimension d.
 
     Params:
         :d: dimension of the system
         :func: function to perform on each bell state. default is None, which just prints the bell states without doing anything
         :bell_gen_func: function to generate the bell states. default is bell_us, which generates the bell states in the old way
+        :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
     '''
     entangled = 0
 
+    if odd_p:
+        p_ls = [2*n+1 for n in range(d)]
+    else:
+        p_ls = range(d)
+
     for c in range(d):
-        for p in range(d):
+        for p in p_ls:
             print(c, p)
             ent = check_entangled(bell_gen_func(d, c, p), display_val=True)
             if ent == True:
@@ -246,11 +252,9 @@ def display_bell(bell):
         if b != 0:
             L = i // d
             R = i % d
-            print(b[0])
             # convert coeff to mag, angle
             mag = np.abs(b[0]).real
             phase = np.angle(b[0]).real
-            print(mag, phase)
             if bell_str == '':
                 bell_str+=f'{mag}e^{phase}*1j |{L}>|{R}>'
             else:
@@ -318,21 +322,83 @@ def make_entangled(bell, x0_ls = None):
     print(list(x_best))
     return x_best
 
+def correct_bell(bell, corr_str):
+    '''Takes in a str of the form 'coeff1 |L1>|R1> + coeff2 |L2>|R2> + ...' and returns the corrected bell state.
 
+    Params:
+        :bell: d^2 x 1 vector
+        :corr_str: string of the form 'coeff1 |L1>|R1> + coeff2 |L2>|R2> + ...'    
+    '''
+
+    d = int(np.sqrt(len(bell)))
+    bell = bell.reshape((d**2,))
+    bell /= np.linalg.norm(bell)
+
+    corr = convert_bell_str(corr_str, d)
+    corr = corr.reshape((d**2,))
+    bell += corr
+    bell /= np.linalg.norm(bell)
+    return bell
+
+def all_orthogonal(d, bell_func=bell_s, odd_p=False):
+    '''Check if all bell states in given construction are orthogonal.
+
+    Params:
+        :d: dimension of the system
+        :bell_func: function to generate the bell states. default is bell_s, which generates the bell states in symmetrized way
+        :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
+
+    '''
+
+    if odd_p:
+        p_ls = [2*n+1 for n in range(d)]
+    else:
+        p_ls = range(d)
+
+    bell_ls = []
+
+    for c in range(d):
+        for p in p_ls:
+            bell = bell_func(d, c, p)
+            # check if dot product is 0 with all other bell states
+            for j, b in enumerate(bell_ls):
+                # take dot product
+                dot = np.dot(b.conj().T, bell)[0][0]
+                if not np.isclose(dot, 0, 1e-10):
+                    print('Not orthogonal!')
+                    print(dot)
+                    c_b = j // d
+                    if odd_p:
+                        p_b = (j % d) * 2 + 1
+                    else:
+                        p_b = j % d
+                    print(f'{c_b, p_b}: {b}')
+                    print(f'{c, p}: {bell}')
+                    return False
+            bell_ls.append(bell)
+    print('All orthogonal!')
+    return True
+            
 if __name__ == '__main__':
-    d = 4
-    bell = make_bell(d=d, c=3, p=2)
-    bell_str = display_bell(bell)
-    print(bell_str)
-    bell_conv = convert_bell_str(bell_str, d)
-    print(np.isclose(bell, bell_conv, 1e-10))
-    print(bell - bell_conv)
-    print(bell)
-    print('------')
-    print(bell_conv)
+    d = 6
+    all_orthogonal(d, bell_func=bell_s, odd_p=True)
+    check_all_entangled(d, bell_gen_func=bell_s, odd_p=True)
+    
 
-    # d = 4
-    # bell = bell_s(d, 3, 2)
+
+
+    # bell = make_bell(d=d, c=3, p=0)
+    # print('entanglement:', check_entangled(bell, ret_val=True))
+    # bell_str = display_bell(bell)
+    # print(bell_str)
+    # print('------')
+
+    # bell_add = '1 |0>|1> + 1 |1>|0>'
+    # bell_tot = correct_bell(bell, bell_add)
+    # print('entanglement:', check_entangled(bell_tot, ret_val=True))
+    # print(display_bell(bell_tot))
+
+    
 
 
     # 2.178436944154104e-07
@@ -388,9 +454,6 @@ if __name__ == '__main__':
     # check_all_bell(d, display_bell, bell_s)
     # print(check_all_entangled(d))
     # find_params(d, bell_s)
-
-
-
 
     #     x_best =  np.array([
 #     -0.39914514+0.j, 0.66802457+0.j, 0.37203545+0.j, -0.04055752+0.j, 
