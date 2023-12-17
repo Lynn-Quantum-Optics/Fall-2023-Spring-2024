@@ -246,13 +246,15 @@ def display_bell(bell):
         if b != 0:
             L = i // d
             R = i % d
+            print(b[0])
             # convert coeff to mag, angle
             mag = np.abs(b[0]).real
             phase = np.angle(b[0]).real
+            print(mag, phase)
             if bell_str == '':
-                bell_str+=f'{mag}e^{phase}1j |{L}>|{R}>'
+                bell_str+=f'{mag}e^{phase}*1j |{L}>|{R}>'
             else:
-                bell_str+=f'+ {mag}e^{phase}1j |{L}>|{R}>'
+                bell_str+=f'+ {mag}e^{phase}*1j |{L}>|{R}>'
     return bell_str
 
 def convert_bell_str(bell_str, d):
@@ -267,7 +269,7 @@ def convert_bell_str(bell_str, d):
         if 'e' in coeff:
             coeff = coeff.split('e^')
             mag = float(coeff[0])
-            angle = float(coeff[1].split('j')[0])
+            angle = float(coeff[1].split('*')[0])
             coeff = mag*np.exp(angle * 1j)
         ket_pair = term[1]
         # get L and R values
@@ -319,43 +321,54 @@ def make_entangled(bell, x0_ls = None):
 
 if __name__ == '__main__':
     d = 4
-    bell = bell_s(d, 3, 2)
+    bell = make_bell(d=d, c=3, p=2)
+    bell_str = display_bell(bell)
+    print(bell_str)
+    bell_conv = convert_bell_str(bell_str, d)
+    print(np.isclose(bell, bell_conv, 1e-10))
+    print(bell - bell_conv)
+    print(bell)
+    print('------')
+    print(bell_conv)
+
+    # d = 4
+    # bell = bell_s(d, 3, 2)
 
 
     # 2.178436944154104e-07
-    x_best = np.array([1.1997766718739271, 0.2907492336982105, 0.39058612525764613, -0.25800554800457315, 0.2907189484204616, 0.9062780259041427, -0.6162903349319176, 0.5123047254690065, 0.3905610806086528, -0.6163054806422082, -0.041125496512232865, 0.589393242091415, -0.2579983973239351, 0.5123126946718567, 0.589415047039367, -0.15156466406436406, 0.16378271096375777, -0.29319488806431654, 0.168736597332674, -0.33205964778452635, -0.2932049809147356, 0.10345587141750738, -0.28618211804482585, 0.3082520017570542, 0.16874070004525968, -0.28618116089140777, 0.34476755031744744, 0.8472527206234807, -0.3320591801345535, 0.30825506534625174, 0.8472623994986536, 0.44267075823579843])
+    # x_best = np.array([1.1997766718739271, 0.2907492336982105, 0.39058612525764613, -0.25800554800457315, 0.2907189484204616, 0.9062780259041427, -0.6162903349319176, 0.5123047254690065, 0.3905610806086528, -0.6163054806422082, -0.041125496512232865, 0.589393242091415, -0.2579983973239351, 0.5123126946718567, 0.589415047039367, -0.15156466406436406, 0.16378271096375777, -0.29319488806431654, 0.168736597332674, -0.33205964778452635, -0.2932049809147356, 0.10345587141750738, -0.28618211804482585, 0.3082520017570542, 0.16874070004525968, -0.28618116089140777, 0.34476755031744744, 0.8472527206234807, -0.3320591801345535, 0.30825506534625174, 0.8472623994986536, 0.44267075823579843])
 
-    print(f'loss: {loss(x_best, bell)}')
+    # print(f'loss: {loss(x_best, bell)}')
     
-    x_best = make_entangled(bell, x0_ls=[x_best])
+    # x_best = make_entangled(bell, x0_ls=[x_best])
     
-    corr = x_best[:d**2]+1j*x_best[d**2:]
-    corr = corr.reshape((d**2, 1))
-    corr_str = display_bell(corr)
-    bell_corr = bell + corr
-    bell_corr /= np.linalg.norm(bell_corr)
-    print('actual xbest', check_entangled(bell_corr, display_val=True))
+    # corr = x_best[:d**2]+1j*x_best[d**2:]
+    # corr = corr.reshape((d**2, 1))
+    # corr_str = display_bell(corr)
+    # bell_corr = bell + corr
+    # bell_corr /= np.linalg.norm(bell_corr)
+    # print('actual xbest', check_entangled(bell_corr, display_val=True))
 
 
 
-    coeff_str = '0.4432427419467506e^0.135672382684276841j |0>|0>+ 0.15114436852118282e^-0.78958630396705731j |0>|1>+ 0.15574231179815554e^0.407792055538780731j |0>|2>+ 0.15392544651512838e^-2.2313456871371841j |0>|3>+ 0.15113918626738287e^-0.7896555971982711j |1>|0>+ 0.3338910271548267e^0.113662653137927031j |1>|1>+ 0.24872439401574603e^-2.7068592748368281j |1>|2>+ 0.21885424056587785e^0.54166605263735571j |1>|3>+ 0.15573449178174745e^0.40782425306561061j |2>|0>+ 0.24872927476010348e^-2.7068699399226141j |2>|1>+ 0.1270943457055362e^1.68952005508808181j |2>|2>+ 0.3777912053378135e^0.96299429478083921j |2>|3>+ 0.1539237054129368e^-2.23133294147367561j |3>|0>+ 0.21885731821629087e^0.54166357129468391j |3>|1>+ 0.3777986717123001e^0.96298230724144271j |3>|2>+ 0.17127097129382063e^1.90067283193149831j |3>|3>'
+    # coeff_str = '0.4432427419467506e^0.135672382684276841j |0>|0>+ 0.15114436852118282e^-0.78958630396705731j |0>|1>+ 0.15574231179815554e^0.407792055538780731j |0>|2>+ 0.15392544651512838e^-2.2313456871371841j |0>|3>+ 0.15113918626738287e^-0.7896555971982711j |1>|0>+ 0.3338910271548267e^0.113662653137927031j |1>|1>+ 0.24872439401574603e^-2.7068592748368281j |1>|2>+ 0.21885424056587785e^0.54166605263735571j |1>|3>+ 0.15573449178174745e^0.40782425306561061j |2>|0>+ 0.24872927476010348e^-2.7068699399226141j |2>|1>+ 0.1270943457055362e^1.68952005508808181j |2>|2>+ 0.3777912053378135e^0.96299429478083921j |2>|3>+ 0.1539237054129368e^-2.23133294147367561j |3>|0>+ 0.21885731821629087e^0.54166357129468391j |3>|1>+ 0.3777986717123001e^0.96298230724144271j |3>|2>+ 0.17127097129382063e^1.90067283193149831j |3>|3>'
 
-    coeffs = coeff_str.split('+') # evaluate each term
-    coeff_tot = convert_bell_str(coeff_str, d)
-    for coeff in coeffs:
-        print(coeff)
-        coeff_vec = convert_bell_str(coeff, d)
-        bell_cor = bell + coeff_vec
-        bell_cor /= np.linalg.norm(bell_cor)
-        print(check_entangled(bell_cor, display_val=True))
-        print('-----')
+    # coeffs = coeff_str.split('+') # evaluate each term
+    # coeff_tot = convert_bell_str(coeff_str, d)
+    # for coeff in coeffs:
+    #     print(coeff)
+    #     coeff_vec = convert_bell_str(coeff, d)
+    #     bell_cor = bell + coeff_vec
+    #     bell_cor /= np.linalg.norm(bell_cor)
+    #     print(check_entangled(bell_cor, display_val=True))
+    #     print('-----')
 
    
-    print(coeff_tot)
-    print('*~*~*~')
-    print(corr)
-    print('*~*~*~')
-    print(f'norm = {np.linalg.norm(coeff_tot - corr)}')
+    # print(coeff_tot)
+    # print('*~*~*~')
+    # print(corr)
+    # print('*~*~*~')
+    # print(f'norm = {np.linalg.norm(coeff_tot - corr)}')
 
    
 
