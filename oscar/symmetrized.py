@@ -4,7 +4,30 @@ import numpy as np
 from functools import partial
 from u_parametrize import *
 from trabbit import trabbit
+import matplotlib.pyplot as plt
 
+def print_matrix(matrix, title=None):
+    '''Prints matrix using imshow'''
+    mag = np.abs(matrix)
+    phase = np.angle(matrix)
+
+    # where mag is 0, phase is 0
+    phase = np.where(np.isclose(mag, 0, 1e-10), 0, phase)
+
+    # make plot
+    fig, ax = plt.subplots(1, 2, figsize=(10,5))
+    ax[0].imshow(mag)
+    ax[0].set_title('Magnitude')
+    ax[0].axis('off')
+    ax[1].imshow(phase)
+    ax[1].set_title('Phase')
+    ax[1].axis('off')
+
+    if title is not None:
+        plt.suptitle(title)
+        plt.savefig('figs/' + title + '.pdf')
+    else:
+        plt.show()
 
 def check_entangled(bell, ret_val = False, display_val=False):
     '''Computes reduced density matrix for each particle and checks if they are mixed.
@@ -22,7 +45,7 @@ def check_entangled(bell, ret_val = False, display_val=False):
     bell /= np.linalg.norm(bell)
 
     # get density matrix
-    rho = np.outer(bell, np.conj(bell))
+    rho = bell @ np.conj(bell)
 
     # get reduced density matrix
     rho_reduced = np.zeros((d, d), dtype=complex)
@@ -72,7 +95,48 @@ def bell_us(d, c, p):
 
     return bell
 
-def bell_s_2(d, c, p):
+def bell_s(d, c, p):
+    '''Function to generate a bell state in the joint particle basis that specifically is symmetric.
+
+    Params:
+        :d: dimension of the system
+        :c: correlation class
+        :p: phase class
+    
+    '''
+    bell = np.zeros((d**2, 1), dtype=complex)
+    exp_initial = 2*np.pi*1j*p / d
+    for j in range(d):
+        # bell_j = np.zeros((d**2, 1), dtype=complex)
+        L = j
+        R = (j+c) % d
+        index_1 = L*d + R
+        # phase = np.exp(2*np.pi*1j*j*p / d)
+        
+        # print(np.abs(phase), np.angle(phase))
+        # phase = np.exp(np.pi*1j*j*(p -3) / d)
+        # phase = np.exp(2 * np.pi * 1j * (j * c**2 + p**2) / d)
+        if c % (d//2) == 0:
+            phase = np.exp(exp_initial + (-1)**j*2*np.pi/(d//2))
+            print((-1)**j*2*np.pi/(d//2))
+        
+
+        if c!= 0 or (d % 2 == 0 and j == d//2):
+            index_2 = R*d + L
+            bell[index_1] = phase
+            bell[index_2] = phase
+            # if p % 2 == 0: # if even p
+            #     bell[0] = phase
+        else:
+            phase = np.exp(np.pi*1j*j*(p-1) / d)
+            bell[index_1] = phase
+
+
+    # normalize
+    bell /= np.linalg.norm(bell)
+    return bell
+
+def bell_s2(d, c, p):
     '''Function to generate a bell state in the joint particle basis that specifically is symmetric.
 
     Params:
@@ -119,28 +183,27 @@ def bell_s_2(d, c, p):
     bell /= np.linalg.norm(bell)
     return bell
 
-def bell_s(d, c, p):
-    '''Function to generate a bell state in the joint particle basis that specifically is symmetric.
+def bell_s3(d, c, p):
+    '''Function to generate a symmetric Bell state in the joint particle basis.
 
     Params:
         :d: dimension of the system
         :c: correlation class
         :p: phase class
-    
     '''
-    bell = np.zeros((d**2, 1), dtype=complex)
+    bell = np.zeros((d**2, 1), dtype=complex)    
     for j in range(d):
         L = j
         R = (j+c) % d
-        index = L*d + R
-        bell[index] = np.exp(2*np.pi*1j*p*j / d)
-        if c!= 0 or (d % 2 == 0 and j == d//2):
-            index = R*d + L
-            bell[index] = np.exp(2*np.pi*1j*p*j / d)
-            if p %2 == 0: # if even p
-                bell[0] = np.exp(2*np.pi*1j*p*j / d)
+        index1 = L*d + R
+        index2 = R*d + L
+        phase = np.exp(2*np.pi*1j*j*((p - 1) // 2) / d)
 
-    # normalize
+        # symmetrize
+        bell[index1] = phase
+        bell[index2] = phase
+
+    # normalize 
     bell /= np.linalg.norm(bell)
     return bell
 
@@ -216,7 +279,7 @@ def check_all_bell(d, func = None, bell_gen_func = bell_us):
                 print(bell_gen_func(d, c, p), display_val=True)
             print('-----')
 
-def check_all_entangled(d, bell_gen_func = bell_s, odd_p = False):
+def check_all_entangled(d, bell_gen_func = bell_s, odd_p = False, prop_c = False):
     '''Performs the function func on each of the bell states for a given dimension d.
 
     Params:
@@ -224,15 +287,25 @@ def check_all_entangled(d, bell_gen_func = bell_s, odd_p = False):
         :func: function to perform on each bell state. default is None, which just prints the bell states without doing anything
         :bell_gen_func: function to generate the bell states. default is bell_us, which generates the bell states in the old way
         :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
+        :prop_c: whether to use c = 0, 1, ..., d-1 or just c = n * d//2. default is False, which uses normal c
     '''
     entangled = 0
 
     if odd_p:
         p_ls = [2*n+1 for n in range(d)]
+        # p_ls = np.array([2*n+1 for n in range(d)])+4
+        # # remove 3 and add one more odd
+        # p_ls.remove(3)
+        # p_ls.append(2*d+1)
     else:
         p_ls = range(d)
 
-    for c in range(d):
+    if prop_c:
+        c_ls = [n*d//2 for n in range(d)]
+    else:
+        c_ls = range(d)
+
+    for c in c_ls:
         for p in p_ls:
             print(c, p)
             ent = check_entangled(bell_gen_func(d, c, p), display_val=True)
@@ -240,7 +313,7 @@ def check_all_entangled(d, bell_gen_func = bell_s, odd_p = False):
                 entangled += 1
             print('-----')
 
-    return entangled
+    return entangled == d**2
 
 def display_bell(bell):
     '''Converts bell state as vector and prints it in bra ket form.'''
@@ -289,7 +362,7 @@ def convert_bell_str(bell_str, d):
 entanglement = partial(check_entangled, ret_val=True)
 symmet = partial(symmetric, ret_norm=True)
 
-def loss(x, bell):
+def loss_ent(x, bell):
     bell = bell.reshape((d**2,))
     # convert to full vector
     vec = x[:d**2] + 1j*x[d**2:]
@@ -302,6 +375,17 @@ def loss(x, bell):
     ent_imag = np.imag(ent)
     targ_ent = 1/d
     return (ent_real - targ_ent)**2 + (ent_imag)**2 + sym**2
+
+# def loss_orth(x, d):
+#     # find the inner products of all bell states
+#     bell_ls = []
+#     for c in range(d):
+#         for p in range(d):
+#             bell_ls.append(bell_s(d, c, p))
+            
+#     # convert to full vector
+#     vec = x[:d**2] + 1j*x[d**2:]
+#     bell_ls = np.array(bell_ls)
 
 def make_entangled(bell, x0_ls = None):
     '''Uses GD to find the state we need to add to the bell state to make it fully entangled'''
@@ -340,49 +424,232 @@ def correct_bell(bell, corr_str):
     bell /= np.linalg.norm(bell)
     return bell
 
-def all_orthogonal(d, bell_func=bell_s, odd_p=False):
+def get_d_primes(d):
+    '''Finds the first d primes'''
+    primes = []
+    n = 2
+    while len(primes) < d:
+        # check if 'number' is prime
+        is_prime = True
+        for prime in primes:
+            if n % prime == 0:
+                is_prime = False
+                break
+        # If it is prime, add to the list
+        if is_prime:
+            primes.append(n)
+        n += 1
+    return primes
+
+def all_orthogonal(d, bell_func=bell_s, odd_p=False, prop_c=False):
     '''Check if all bell states in given construction are orthogonal.
 
     Params:
         :d: dimension of the system
         :bell_func: function to generate the bell states. default is bell_s, which generates the bell states in symmetrized way
         :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
+        :prop_c: whether to use c = 0, 1, ..., d-1 or just c = n * d//2. default is False, which uses normal c
 
     '''
 
     if odd_p:
-        p_ls = [2*n+1 for n in range(d)]
+        p_ls = np.array([2*n+1 for n in range(d)])+2
+        # p_ls = np.array([2*n+1 for n in range(d)])+4
+        # remove 3 and add one more odd
+        # p_ls.remove(3)
+        # p_ls.append(2*d+1)
+        # what if prime?
+        # get the first d primes
+        # p_ls = get_d_primes(d)
+
     else:
         p_ls = range(d)
 
+    if prop_c:
+        c_ls = [n*d//2 for n in range(d)]
+        # c_ls = [n for n in range(d**2)]
+        # remove 3
+        # c_ls.remove(3)
+        # add one more
+        # c_ls.append(2*d+1)
+
+    else:
+        c_ls = range(d)
+
+    # initialize list of ((c,p), bell state) pairs
     bell_ls = []
 
-    for c in range(d):
+    for c in c_ls:
         for p in p_ls:
             bell = bell_func(d, c, p)
             # check if dot product is 0 with all other bell states
-            for j, b in enumerate(bell_ls):
+            for cp, b in bell_ls:
                 # take dot product
-                dot = np.dot(b.conj().T, bell)[0][0]
+                dot = (b.conj().T @  bell)[0][0]
                 if not np.isclose(dot, 0, 1e-10):
                     print('Not orthogonal!')
                     print(dot)
-                    c_b = j // d
-                    if odd_p:
-                        p_b = (j % d) * 2 + 1
-                    else:
-                        p_b = j % d
+                    c_b = cp[0]
+                    p_b = cp[1]
                     print(f'{c_b, p_b}: {b}')
                     print(f'{c, p}: {bell}')
                     return False
-            bell_ls.append(bell)
+            bell_ls.append(((c, p), bell))
     print('All orthogonal!')
     return True
-            
+
+def all_orthogonal3(d, bell_func=bell_s3):
+    '''Check if all bell states in given construction are orthogonal using new convention of only correlation class, same logic as above.'''
+
+    c_ls = range(d**2)
+    bell_ls = []
+    
+    for c in c_ls:
+        bell = bell_func(d, c)
+        # check if dot product is 0 with all other bell states
+        for j, b in enumerate(bell_ls):
+            # take dot product
+            dot = np.dot(b.conj().T, bell)[0][0]
+            if not np.isclose(dot, 0, 1e-10):
+                print('Not orthogonal!')
+                print(dot)
+                print(f'c: {j}, {b}')
+                print(f'{c}: {bell}')
+                return False
+        bell_ls.append(bell)
+
+def all_symmetric(d, bell_func=bell_s, odd_p=False, prop_c=False):
+    '''Check if all bell states in given construction are symmetric wrt particle exchange.
+
+    Params:
+        :d: dimension of the system
+        :bell_func: function to generate the bell states. default is bell_s, which generates the bell states in symmetrized way
+        :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
+        :prop_c: whether to use c = 0, 1, ..., d-1 or just c = n * d//2. default is False, which uses normal c    
+    
+    '''
+
+    if odd_p:
+        p_ls = [2*n+1 for n in range(d)]
+        # p_ls = np.array([2*n+1 for n in range(d)])+4
+        # remove 3 and add one more odd
+        # p_ls.remove(3)
+        # p_ls.append(2*d+1)
+    else:
+        p_ls = range(d)
+    
+    if prop_c:
+        c_ls = [n*d//2 for n in range(d)]
+    else:
+        c_ls = range(d)
+
+    for c in c_ls:
+        for p in p_ls:
+            bell = bell_func(d, c, p)
+            if not symmetric(bell):
+                print('Not symmetric!')
+                print(f'{c, p}: {bell}')
+                return False
+    print('All symmetric!')
+    return True
+
+def is_valid_sym_bell_basis(d, bell_func=bell_s, odd_p=False, prop_c=False):
+    '''Checks if the bell states generated by bell_func form a valid bell basis symmetric wrt particle exchange for the d^2 dimensional space: that is, symmetric wrt particle exchange, orthogonal, and all states are maximally entangled.
+
+    Params:
+        :d: dimension of the system
+        :bell_func: function to generate the bell states. default is bell_s, which generates the bell states in symmetrized way
+        :odd_p: whether to use odd only p or normal 0 -> d-1 p. default is False, which uses normal p
+        :prop_c: whether to use c = 0, 1, ..., d-1 or just c = n * d//2. default is False, which uses normal c
+    
+    '''    
+    if not check_all_entangled(d, bell_gen_func=bell_func, odd_p = odd_p, prop_c = prop_c):
+        print('Not all entangled!')
+        return False
+    
+     # check if all bell states are orthogonal
+    if not all_orthogonal(d, bell_func=bell_func, odd_p=odd_p, prop_c=prop_c):
+        print('Not orthogonal!')
+        return False
+    
+    if not all_symmetric(d, bell_func=bell_func, odd_p = odd_p, prop_c = prop_c):
+        print('Not symmetric!')
+        return False
+    
+    
+    
+    print('All good!')
+    return True
+
+
 if __name__ == '__main__':
     d = 6
-    all_orthogonal(d, bell_func=bell_s, odd_p=True)
-    check_all_entangled(d, bell_gen_func=bell_s, odd_p=True)
+
+    # print(np.nonzero(bell_s(d, 7, 1)))
+
+    # is_valid_sym_bell_basis(d, bell_func=bell_s, odd_p=True, prop_c=True)
+    print(display_bell(bell_s(d, 3, 5)))
+    print('------')
+    print(display_bell(bell_s(d, 3, 3)))
+    print('------')
+    print(bell_s(d, 3, 5).conj().T @ bell_s(d, 3, 3))
+
+
+
+    # factor = max([2*n+1 for n in range(d)])
+    # x_ls = np.linspace(0, 1, 100)
+    # fig, ax = plt.subplots(2, 1)
+    # for p in [n for n in range(d)]:
+    #     print(f'--------p = {p}-------')
+    #     p_ls= []
+    #     for j in range(d):
+    #         # print(np.exp(2*np.pi*1j*(2*j+1)*p / factor))
+    #         # print(np.exp(2*np.pi*1j*j*p / d))
+    #         # p_ls.append(np.exp(2*np.pi*1j*j*p / d))
+            
+    #         ax[0].plot(x_ls, np.sin(2*np.pi*(2*j+1) * p / factor *x_ls))
+    #         ax[1].plot(x_ls, np.sin(2*np.pi*j*p / d *x_ls))
+    #         # p_ls.append(np.exp(np.pi*1j*(2*j+1)*p / factor))
+    #     # plt.plot(p_ls, label=f'p = {p}')
+    # ax[0].legend()
+    # ax[1].legend()
+    # plt.savefig('figs/p_ls_n.pdf')
+    # plt.show()
+
+    
+    # for c in range(d**2):
+    #     bell = bell_s3(d, c)
+    #     print(f'c = {c}, entanglement = {check_entangled(bell, ret_val=True)}')
+    #     print(symmetric(bell))
+
+    # all_orthogonal3(d)
+    
+    # for w in np.linspace(0, 2, 10):
+    #     print('-----')
+    #     print(f'w = {w}')    
+    #     bell_func = partial(bell_s, w=w)
+    #     is_valid_sym_bell_basis(d, bell_func=bell_s, odd_p=True, prop_c=True)
+    # print(display_bell(bell_s(d, 0, 5)))
+    # print('--------')
+    # print(display_bell(bell_s(d, 0, 11)))
+
+
+
+    # c1, p1 = 1, 2
+    # c2, p2 = 2, 3
+    # bell1 = bell_s(d, c1, p1)
+    # bell2 = bell_s(d, c2, p2)
+
+    # print_matrix(np.round(np.outer(bell1, np.conj(bell1)), 10), title=f'{c1}_{p1}_{d}')
+    # print('------')
+    # print_matrix(np.round(np.outer(bell2, np.conj(bell2)), 10), title=f'{c2}_{p2}_{d}')
+
+    # bell = bell_s(d=d, c=9, p=3)
+    # print('entanglement:', check_entangled(bell, ret_val=True))
+
+    # all_orthogonal(d, bell_func=bell_s, odd_p=True, even_c = True)
+    # check_all_entangled(d, bell_gen_func=bell_s, odd_p=True, even_c = True)
+
     
 
 
