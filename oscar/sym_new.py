@@ -3,7 +3,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from symmetrized import check_entangled, symmetric, display_bell, convert_bell_str
-from trabbit import trabbit
+from oscars_toolbox.trabbit import trabbit
 
 def permutation_to_integer(perm):
     '''Converts a permutation to its integer value via reverse CNS.
@@ -35,6 +35,9 @@ def bell_6(c, p, phase_ls=None):
     
     RL_ls = RL_ls_ls[c]
 
+    # determine all the ways of summing to 6
+    p1_p2_ls = [(0, 6), (1, 5), (2, 4), (3, 3), (4, 2), (5, 1), (6, 0)]
+
     # initialize bell vector
     bell_vec = np.zeros((36, 1), dtype=complex)
     for i in range(len(RL_ls)): 
@@ -46,18 +49,26 @@ def bell_6(c, p, phase_ls=None):
         # phase = np.exp(2 * np.pi * 1j * i * p / 3)
         if len(RL_ls) == 3: # 3 terms * 2 for complex = 6 params
             # if i == 0:
-            #     phase = np.exp(2 * np.pi * 1j * p / 6)
+            #     phase = np.exp(2 *s np.pi * 1j * p / 6)
             # elif i == 1:
             #     phase = np.exp((2 * np.pi * 1j * p / 6) + (2 * np.pi * 1j / 3))
             # else:
             #     phase = np.exp((2 * np.pi * 1j * p / 6) - (2 * np.pi * 1j / 3))
 
-            # if p <3:
-            #     phase = np.exp(2 * np.pi * 1j * i * p/ 3)
+            # if p < 3:
+            #     phase = np.exp(2 * np.pi * 1j * i * p / 3)
             # else:
-            #     phase = np.exp(2*np.pi*1j*i*p**2/36)
+            #     phase = np.exp(2 * np.pi * 1j * i * p / 3)
 
-            phase = np.exp(2*np.pi*1j*i*(p+i)/6)
+            # theta = 2 * np.pi * 1j * p / 3
+            # alpha = 
+
+
+            # phase = (theta + alpha*i + beta*i**2) % (2*np.pi)
+            p1, p2 = p1_p2_ls[p]
+            phase = np.exp(np.pi*1j*i*p1)*np.exp(2*np.pi*1j*i*p2/3)
+
+            # phase = np.exp(2*np.pi*1j*i*(p+i)/6)
 
 
             # if phase_ls is not None:
@@ -187,4 +198,12 @@ if __name__ == '__main__':
     # perm4 = [4, 3, 5, 1, 0, 2]
     # perm5 = [5, 2, 1, 4, 3, 0]
     # perm_ls = [perm0, perm1, perm2, perm3, perm4, perm5]
+    # for perm in perm_ls:
+    #     perm_str = ''
+    #     for i in range(len(perm)):
+    #         if i == 0:
+    #             perm_str += '|'+str(perm0[i])+str(perm[i])+'>'
+    #         else:
+    #             perm_str += '+ |'+str(perm0[i])+str(perm[i])+'>'
+    #     print(perm_str)
    
