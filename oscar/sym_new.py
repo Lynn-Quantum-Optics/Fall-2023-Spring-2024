@@ -22,108 +22,132 @@ def permutation_to_integer(perm):
 
     return val
 
-def bell_6(c, p, phase_ls=None):
-    '''Generates d = 6 bell states for a given c (new definition from before) and p.
+def bell_6(c, p, add_sec_term=True):
+    '''Generates d = 6 bell states for a given c (new definition from before) and p. assumes indistinguishable particles.
 
     Params:
         c (int): correlation class, bounded by 0 and 5
         p (int): phase class, bounded by 0 and 5
-        phase_ls (list): list of phases to multiply each bell state by
+        add_sec_term (bool): whether to add the second term in the bell state (see notes)
+
     '''
 
     RL_ls_ls = [[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)], [(0, 1), (2, 3), (4, 5)], [(0, 2), (1, 4), (3, 5)], [(0, 3), (2, 4), (1, 5)], [(0, 4), (1, 3), (2, 5)], [(0, 5), (1, 2), (3, 4)]]
     
     RL_ls = RL_ls_ls[c]
 
-    # determine all the ways of summing to 6
-    p1_p2_ls = [(0, 6), (1, 5), (2, 4), (3, 3), (4, 2), (5, 1), (6, 0)]
-
     # initialize bell vector
-    bell_vec = np.zeros((36, 1), dtype=complex)
+    if add_sec_term:
+        bell_vec = np.zeros((36, 1), dtype=complex)
+    else:
+        bell_vec = np.zeros((12, 1), dtype=complex)
     for i in range(len(RL_ls)): 
         L, R = RL_ls[i]
         # get the index of the permuted bell state
-        index1 = 6 * L + R
-        index2 = 6 * R + L
+        index1 = L + R
 
         # phase = np.exp(2 * np.pi * 1j * i * p / 3)
         if len(RL_ls) == 3: # 3 terms * 2 for complex = 6 params
-            # if i == 0:
-            #     phase = np.exp(2 *s np.pi * 1j * p / 6)
-            # elif i == 1:
-            #     phase = np.exp((2 * np.pi * 1j * p / 6) + (2 * np.pi * 1j / 3))
-            # else:
-            #     phase = np.exp((2 * np.pi * 1j * p / 6) - (2 * np.pi * 1j / 3))
-
-            # if p < 3:
-            #     phase = np.exp(2 * np.pi * 1j * i * p / 3)
-            # else:
-            #     phase = np.exp(2 * np.pi * 1j * i * p / 3)
-
-            # theta = 2 * np.pi * 1j * p / 3
-            # alpha = 
-
-
-            # phase = (theta + alpha*i + beta*i**2) % (2*np.pi)
-            p1, p2 = p1_p2_ls[p]
-            phase = np.exp(np.pi*1j*i*p1)*np.exp(2*np.pi*1j*i*p2/3)
-
-            # phase = np.exp(2*np.pi*1j*i*(p+i)/6)
-
-
-            # if phase_ls is not None:
-            #     phase = phase_ls[i]
-            # else:
-            #     phase = np.exp(2*np.pi*1j*i*(p%3)/3 + 2*np.pi*1j*i/(7+p))
-                
+            phase = np.exp(2 * np.pi * 1j * i * p / 3)
 
         else: # c = 0 term
             phase = np.exp(2 * np.pi * 1j * i * p / 6)
 
-        # get the bell state
+        if add_sec_term:
+            index1 = 6*L + R
+            index2 = 6*R + L
+            bell_vec[index2] = phase
+         # get the bell state
         bell_vec[index1] = phase
-        bell_vec[index2] = phase
 
     return bell_vec
 
 def check_all_entangled():
     '''Checks all bell states for entanglement.'''
     for c in range(6):
-        for p in range(6):
-            bell = bell_6(c, p)
-            if not check_entangled(bell, display_val=False):
-                print(f'c = {c}, p = {p} is not entangled.')
-                return False
+        if c == 0:
+            for p in range(6):
+                bell = bell_6(c, p)
+                if not check_entangled(bell, display_val=False):
+                    print(f'c = {c}, p = {p} is not entangled.')
+                    return False
+        else:
+            for p in range(3):
+                bell = bell_6(c, p)
+                if not check_entangled(bell, display_val=False):
+                    print(f'c = {c}, p = {p} is not entangled.')
+                    return False
     print('All bell states are entangled.')
     return True
 
 def check_all_symmetric():
     '''Checks all bell states for symmetry.'''
     for c in range(6):
-        for p in range(6):
-            bell = bell_6(c, p)
-            if not symmetric(bell):
-                print(f'c = {c}, p = {p} is not symmetric.')
-                return False
+        if c == 0:
+            for p in range(6):
+                bell = bell_6(c, p)
+                if not symmetric(bell):
+                    print(f'c = {c}, p = {p} is not symmetric.')
+                    return False
+        else:
+            for p in range(3):
+                bell = bell_6(c, p)
+                if not symmetric(bell):
+                    print(f'c = {c}, p = {p} is not symmetric.')
+                    return False
+            
     print('All bell states are symmetric.')
     return True
 
 def check_all_orthogonal():
     '''Checks all bell states for orthogonality.'''
+    def check_orthogonal(c1, p1, c2, p2):
+        bell1 = bell_6(c1, p1)
+        bell2 = bell_6(c2, p2)
+        if np.abs(bell1.conj().T @ bell2) > 1e-10:
+            print(f'({c1}, {p1}) and ({c2}, {p2}) are not orthogonal.')
+            display_bell(bell1)
+            print('------')
+            display_bell(bell2)
+            print(bell1.conj().T @ bell2)
+            return False
+        return True
+    # c can take on vals 0 to 6
+    # p can take on 0 to 6 if c = 0, 0 to 3 otherwise
     for c1 in range(6):
-        for p1 in range(6):
-            for c2 in range(6):
-                for p2 in range(6):
-                    if c1 != c2 or p1 != p2:
-                        bell1 = bell_6(c1, p1)
-                        bell2 = bell_6(c2, p2)
-                        if np.abs(bell1.conj().T @ bell2) > 1e-10:
-                            print(f'({c1}, {p1}) and ({c2}, {p2}) are not orthogonal.')
-                            display_bell(bell1)
-                            print('------')
-                            display_bell(bell2)
-                            print(bell1.conj().T @ bell2)
-                            return False
+        if c1 == 0:
+            for p1 in range(6):
+                for c2 in range(c1, 6):
+                    if c2 == c1:
+                        for p2 in range(p1+1, 6):
+                            if not check_orthogonal(c1, p1, c2, p2):
+                                return False
+                    else:
+                        if c2 == 0:
+                            for p2 in range(3):
+                                if not check_orthogonal(c1, p1, c2, p2):
+                                    return False
+                        else:
+                            for p2 in range(6):
+                                if not check_orthogonal(c1, p1, c2, p2):
+                                    return False
+        else:
+            for p1 in range(3):
+                for c2 in range(c1, 6):
+                    if c2 == c1:
+                        for p2 in range(p1+1, 3):
+                            if not check_orthogonal(c1, p1, c2, p2):
+                                return False
+                    else:
+                        if c2 == 0:
+                            for p2 in range(3):
+                                if not check_orthogonal(c1, p1, c2, p2):
+                                    return False
+                        else:
+                            for p2 in range(6):
+                                if not check_orthogonal(c1, p1, c2, p2):
+                                    return False
+                                
     print('All bell states are orthogonal.')
     return True
 
@@ -171,9 +195,19 @@ def find_phases():
 if __name__ == '__main__':
     # check_all_entangled()
     # check_all_symmetric()
-    check_all_orthogonal()
+    # check_all_orthogonal()
+    # bell = bell_6(1, 0, add_sec_term=False)
+    # display_bell(bell)
+    # print(check_entangled(bell, display_val=True, add_sec_term=False))
+    # print(symmetric(bell))
 
-    # find_phases()
+    N = lambda n: 2**(2*n-1)-1
+    k = lambda n: 2**(n+1)-1
+    plt.plot([N(n) for n in range(1, 10)], label='N')
+    plt.plot([k(n) for n in range(1, 10)], label='k')
+    plt.plot([2**(2*n) for n in range(1, 10)], label='n^2')
+    plt.legend()
+    plt.show()
 
     
 
