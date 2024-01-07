@@ -358,6 +358,7 @@ def find_params(d, combinations, use_int=True, parallel=False):
         return x_best
     
     else:
+        print(f'Running in parallel with {ProcessPoolExecutor()._max_workers} workers.')
         # Create a pool of workers using all available CPUs
         with ProcessPoolExecutor() as executor:  # Defaults to the number of CPUs
             futures = [executor.submit(opt_task) for _ in range(executor._max_workers)]
@@ -463,6 +464,7 @@ def display_matrix(mat):
     plt.show()
 
 if __name__ == '__main__':
+    print('starting test')
     d = 6
     find_params(d, combinations=[(c, 0) for c in range(d)], use_int=False, parallel=True)
 
