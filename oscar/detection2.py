@@ -223,8 +223,29 @@ def U_guess(params, d):
         U = np.kron(U, U)
     except RuntimeError:
         raise ValueError(f'Invalid parameters: {params}')
-    
-    # print(f'U: {U}')
+
+    return U
+
+from sympy import Matrix, sqrt, exp, I, pi, zeros, symbols, pprint
+
+def U_guess_sympy(d):
+    '''Returns matrix based on Lynn's guess using sympy for symbolic computation.'''
+
+    # Create symbolic parameters for q and r
+    q_ls = symbols(f'q0:{d**2}')
+    r_ls = symbols(f'r0:{d**2}')
+
+    # Zip together
+    qr_ls = zip(q_ls, r_ls)
+
+    # Create matrix using sympy
+    U = zeros(d, d)
+    for i, (q, r) in enumerate(qr_ls):
+        row, col = divmod(i, d)
+        U[row, col] = sqrt(q/d) * exp(I * 2 * pi * r / d)
+
+    # Use kronecker product (tensor product) for the final matrix
+    U = Matrix(np.kron(U, U))
 
     return U
 
@@ -466,7 +487,14 @@ def display_matrix(mat):
 if __name__ == '__main__':
     print('starting test')
     d = 6
-    find_params(d, combinations=[(c, 0) for c in range(d)], use_int=False, parallel=True)
+    find_params(d, combinations=[(c, 0) for c in range(d)], use_int=False, parallel=False)
+    # U_symp = U_guess_sympy(d)
+
+    # print(get_k(d, U_symp, combinations=[(c, 0) for c in range(d)], ret_c = True, display=False))
+
+
+    # bell1 = get_bell(d, 0, 0)
+    # bell2 = get_bell(d, 1, 0)
 
 
     # diag = diagonal_phase(d, [np.exp(1j*2*np.pi*i/d) for i in range(1,d)])
