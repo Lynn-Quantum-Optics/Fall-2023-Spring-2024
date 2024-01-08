@@ -249,31 +249,6 @@ def U_guess_sympy(d):
 
     return U
 
-# def rand_seq_to_sum(n, size=None):
-#     '''Helper func for random_guess to generate a random sequence of length size that sums to n.'''
-#     if size is None:
-#         size = n # default to n
-
-#      # generate a list of random integers
-#     numbers = np.random.randint(0, n, size=size) 
-    
-#     # adjust sum of list to match n
-#     current_sum = sum(numbers)
-#     while current_sum != n:
-#         for i in range(size):
-#             if current_sum < n:
-#                 increment = min(np.random.randint(0, n), n - current_sum)
-#                 numbers[i] += increment
-#                 current_sum += increment
-#             elif current_sum > n:
-#                 decrement = min(numbers[i], current_sum - n)
-#                 numbers[i] -= decrement
-#                 current_sum -= decrement
-
-#             if current_sum == n:
-#                 break
-#     return numbers
-
 def rand_seq_to_sum(n, use_int=True):
     '''Generates random sequence of numbers of size n that sum to n.
 
@@ -394,7 +369,6 @@ def find_params(d, combinations, use_int=True, parallel=False):
         print(f'Best params: {list(best_result[0])}')
         print(f'Best loss: {best_result[1]}')
         return best_result[0]
-
 
 # ------ optimize based on given rotations -------- #
 def loss_gr(params, d, combinations, ret_c):
@@ -535,6 +509,7 @@ if __name__ == '__main__':
         comb1: (c, 0) for c in range(d) + (0,1)     
     '''
 
+    # found 1/8/23 on sysphus in aws
     comb0_params = [0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06100355776038493, 0.0, 0.0, 3.7248492191224716, 2.458762840804276, 0.0, 0.0, 0.2690569544938626, 4.053622109167405, 4.4408920985006275e-08, 0.0, 2.593739880961608, 2.360520705449435, 0.21669792765696938, 0.0, 0.0, 0.03459782962561464, 4.601070763856098, 0.09842334271826958, 1.6490709678608918e-23, 0.0, 4.974659685099812, 0.40160657935127436, 0.7067750947370453, 1.1578330235381022, 0.0011762260070042117, 0.0, 4.842166976523448, 0.0, 2.316850708921771, 0.0, 3.1115361301974387, 0.0, 2.888463869745582, 0.0, 0.24109763075311855]
 
     # validate_params(comb0_params, d, combinations=[(c, 0) for c in range(d)])
