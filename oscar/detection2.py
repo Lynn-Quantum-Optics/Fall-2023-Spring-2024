@@ -465,7 +465,7 @@ def display_bell(bell, print_bell=True):
         print(bell_str)
     return bell_str
 
-def display_matrix(mat):
+def display_matrix(mat, save=False, filename=None):
     '''Displays matrix as a heatmap.'''
     mag = np.abs(mat)
     phase = np.angle(mat)
@@ -482,47 +482,62 @@ def display_matrix(mat):
     ax[1].set_title('Phase')
     fig.colorbar(im2, ax=ax[1])
 
+    if save and filename is not None:
+        plt.savefig(filename)
+
     plt.show()
 
+def validate_params(params, d, combinations, comb='test'):
+    '''Validates that params determined through optimization are valid.
+
+    Parameters:
+        :params: list of parameters for U
+        :d: dimension of the system
+        :combinations: list of tuples of correlation and phase classes
+        :comb: int specifying which combination to test    
+    '''
+    # first get U
+    U = U_guess(params, d)
+
+    # print out U
+    display_matrix(U)
+
+    np.save(f'saved_U/U_{d}_{comb}.npy', U)
+
+    # check that U is unitary
+    assert np.allclose(U @ U.conj().T, np.eye(d**2), rtol=1e-8), f'U is not unitary. U @ U.conj().T = {U @ U.conj().T}'
+
+    # check that U is non-entangling
+    # assert np.linalg.det(U) == 1, f'U is entangling. det(U) = {np.linalg.det(U)}'
+
+    # get detection sig
+    get_k(d, U, combinations=combinations, display=True)
+
+
 if __name__ == '__main__':
-    print('starting test')
+    from time import time
+    print('starting test...')
     d = 6
-    find_params(d, combinations=[(c, 0) for c in range(d)], use_int=False, parallel=False)
-    # U_symp = U_guess_sympy(d)
+    ## define combinations ##
+    comb0 = [(c, 0) for c in range(d)]
+    comb1 = [(c, 0) for c in range(d)] + [(0, 1)]
 
-    # print(get_k(d, U_symp, combinations=[(c, 0) for c in range(d)], ret_c = True, display=False))
+    t0 = time()
+    print(f'start time is {t0}')
+    find_params(d, combinations=comb1, use_int=False, parallel=False)
+    tf = time()
+    print(f'end time is {tf}')
+    print(f'time elapsed is {tf-t0}')
 
+    ## ------- for testing found results ------- ##
+    ''' key:
+        comb0: (c, 0) for c in range(d)
+        comb1: (c, 0) for c in range(d) + (0,1)     
+    '''
 
-    # bell1 = get_bell(d, 0, 0)
-    # bell2 = get_bell(d, 1, 0)
+    comb0_params = [0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06100355776038493, 0.0, 0.0, 3.7248492191224716, 2.458762840804276, 0.0, 0.0, 0.2690569544938626, 4.053622109167405, 4.4408920985006275e-08, 0.0, 2.593739880961608, 2.360520705449435, 0.21669792765696938, 0.0, 0.0, 0.03459782962561464, 4.601070763856098, 0.09842334271826958, 1.6490709678608918e-23, 0.0, 4.974659685099812, 0.40160657935127436, 0.7067750947370453, 1.1578330235381022, 0.0011762260070042117, 0.0, 4.842166976523448, 0.0, 2.316850708921771, 0.0, 3.1115361301974387, 0.0, 2.888463869745582, 0.0, 0.24109763075311855]
 
-
-    # diag = diagonal_phase(d, [np.exp(1j*2*np.pi*i/d) for i in range(1,d)])
-    # diag = np.array([np.exp(1j*2*np.pi*i*p/d) for p in range(d) for i in range(d)])
-    # diag = diag.reshape((d, d))
-    # U = np.kron(diag, diag)
-    # combinations = [(0, p) for p in range(d)]
-
-    # U = np.eye(d**2)
-    # combinations = [(c, 0) for c in range(d)]
-    
-    # print(get_k(d, U, combinations=combinations))
-
-    # x_best = find_params(d, combinations)
-    # U = U_guess(x_best, d)
-    # verify detection signatures
-    # get_k(d, U, combinations=combinations, display=True)
-
-
-    # params = []
-    # for i in range(d):
-    #     i_ls = [0]*d
-    #     i_ls[i] = d
-    #     params += i_ls
-    # params+=[0]*d**2
-    # U = U_guess(params, d)
-    # combinations = [(c, 0) for c in range(d)]
-    # get_k(d, U, combinations=combinations, display=True)
+    # validate_params(comb0_params, d, combinations=[(c, 0) for c in range(d)])
     
 
 
