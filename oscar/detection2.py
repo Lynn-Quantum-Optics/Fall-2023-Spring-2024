@@ -169,24 +169,17 @@ def check_overlap(signatures, ret_c=True):
     else:
         return val
 
-def get_k(d, U, c_ls=None, p_ls=None, combinations=None, ret_c = True, display=False):
+def get_k(d, U, k_states, ret_c = True, display=False):
     ''''
     Computes the total overlap for a given group of k states, specified by the correlation and phase classes.
 
     Parameters:
         :d: dimension of the system
         :U: unitary operator
-        :c_ls: list of correlation classes
-        :p_ls: list of phase classes
-        :combinations: list of tuples of correlation and phase classes
+        :k_states: list of the bell states
         :ret_c: whether to return the number of overlaps, or to sum the vals at the overlaps
         :display: whether to display the detection signatures as a matrix
     '''
-    if combinations is None:
-        # get all possible combinations of c and p
-        combinations = [(c, p) for c in c_ls for p in p_ls]
-    # get all possible combinations of k states
-    k_states = [get_bell(d, c, p) for c, p in combinations]
     # get detection signatures as matrix
     sigs = np.array([detection_sig(bell, U) for bell in k_states])
     if display:
@@ -317,10 +310,10 @@ def random_guess(d, use_int=True):
         guess += list(rand_seq_to_sum(d, use_int=use_int))
     return guess
 
-def loss(params, d, combinations, ret_c):
+def loss(params, d, k_states, ret_c):
     '''Loss function for optimization based on a parametrized get_k function that logs the c and p ls.'''
     U = U_guess(params, d)
-    overlap_loss = get_k(d, U, combinations=combinations, ret_c=ret_c)
+    overlap_loss = get_k(d, U, k_states=k_states, ret_c=ret_c)
     # # need to ensure sum of each d length sequence is d
     # sum_loss = 0
     # for i in range(0, len(params), d):
@@ -329,10 +322,10 @@ def loss(params, d, combinations, ret_c):
     unitary_loss = np.linalg.norm(np.eye(d**2) - U @ U.conj().T)
     return overlap_loss + unitary_loss
 
-def optimization_task(loss_func, random_func, bounds):
-    return trabbit(loss_func, random_func, bounds=bounds, alpha=0.8, temperature=0.01)
+def optimization_task(loss_func, random_func, bounds, initial_guess=None):
+    return trabbit(loss_func, random_func, bounds=bounds, alpha=0.8, temperature=0.01, x0_ls=initial_guess)
 
-def find_params(d, combinations, use_int=True, parallel=False):
+def find_params(d, combinations, use_int=True, parallel=False, initial_guess=None):
     '''Uses trabbit to find parameters for U.
 
     Parameters:
@@ -341,10 +334,12 @@ def find_params(d, combinations, use_int=True, parallel=False):
         :use_int: whether to use integers for q and r or float
         :parallel: whether to run in parallel
     '''
+    # get the states
+    k_states = [get_bell(d, c, p) for c, p in combinations]
     random_func = partial(random_guess, d=d, use_int=use_int)
-    loss_func = partial(loss, d=d, combinations=combinations, ret_c=False)
+    loss_func = partial(loss, d=d, k_states = k_states, ret_c=False)
     bounds = [(0, d)]*2*d**2
-    opt_task = partial(optimization_task, loss_func=loss_func, random_func=random_func, bounds=bounds)
+    opt_task = partial(optimization_task, loss_func=loss_func, random_func=random_func, bounds=bounds, initial_guess=initial_guess)
 
 
     if not parallel:
@@ -498,7 +493,7 @@ if __name__ == '__main__':
 
     t0 = time()
     print(f'start time is {t0}')
-    find_params(d, combinations=comb1, use_int=False, parallel=False)
+    find_params(d, combinations=comb1, use_int=False, parallel=False, initial_guess=[[1.235161204888607, 0.0, 0.0, 0.0, 0.0, 0.0, 3.5619366850069816, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.79724804715832, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.7972472701687545, 0.0, 0.6709094054450491, 0.0, 0.6709094942628906, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.797210930528499, 0.0, 2.211717043124469, 3.2286898023563553, 0.0, 0.0, 0.0, 1.5275063215320808, 2.5706380357671747e-06, 1.324407500510177, 1.9047651160721664, 2.376593075020871, 0.5815963661854644, 0.2310332140388418, 1.94693364806412, 0.0, 0.08044476052774212, 0.0, 5.052915084053701, 0.0, 0.20959970128123784, 0.5005873049358195, 1.0798317880176238, 0.9092232201052284, 4.148162619805921, 1.0538725811735773e-06, 0.0, 0.0, 2.850900179354211, 0.999826202195426, 0.05219291665468766, 3.2789323217963044, 1.009528460815879, 0.778521837283892, 0.045591264096812724, 1.5614087675653368, 0.519420716354121, 2.0855276254346578]])
     tf = time()
     print(f'end time is {tf}')
     print(f'time elapsed is {tf-t0}')
@@ -513,7 +508,7 @@ if __name__ == '__main__':
     comb0_params = [0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06100355776038493, 0.0, 0.0, 3.7248492191224716, 2.458762840804276, 0.0, 0.0, 0.2690569544938626, 4.053622109167405, 4.4408920985006275e-08, 0.0, 2.593739880961608, 2.360520705449435, 0.21669792765696938, 0.0, 0.0, 0.03459782962561464, 4.601070763856098, 0.09842334271826958, 1.6490709678608918e-23, 0.0, 4.974659685099812, 0.40160657935127436, 0.7067750947370453, 1.1578330235381022, 0.0011762260070042117, 0.0, 4.842166976523448, 0.0, 2.316850708921771, 0.0, 3.1115361301974387, 0.0, 2.888463869745582, 0.0, 0.24109763075311855]
 
     # validate_params(comb0_params, d, combinations=[(c, 0) for c in range(d)])
-    
+
 
 
 
