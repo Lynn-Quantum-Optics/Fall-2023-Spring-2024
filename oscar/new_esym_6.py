@@ -37,13 +37,13 @@ def get_old_phase(d=3):
     '''Get the phase vectors for d = 3 as in the exisiting definition'''
     return [[np.exp(2 * np.pi * 1j * i * p / d) for i in range(d)] for p in range(d)]
 
-## helper functions to test ideas # 
+## helper functions to confirm whether our basis idea is valid # 
 def check_orthogonal(vec_ls):
     # orthogonal = True
     for i in range(len(vec_ls)):
         for j in range(len(vec_ls)):
             if i != j:
-                if not(np.isclose(np.abs(np.array(vec_ls[i]) @ np.array(vec_ls[j]).conj().T), 0, atol=7e-9)):
+                if not(np.isclose(np.abs(np.array(vec_ls[i]) @ np.array(vec_ls[j]).conj().T), 0, atol=1e-12)):
                     print(f'vector {i} and {j} are not orthogonal and have dot product {np.abs(np.array(vec_ls[i]) @ np.array(vec_ls[j]).conj().T)}')
                     # orthogonal = False
                     return False
@@ -77,7 +77,7 @@ def check_constraints_and_orthogonality(vectors):
     return orthogonality and no_zero_entries and correct_pairing
 
 ## learning phase ##
-def get_vectors(params):
+def get_vectors_nonunity(params):
     '''Convert the learned params into phase vectors'''
     # unpack the params
     real_ls = params[:len(params)//2]
@@ -102,6 +102,19 @@ def get_vectors(params):
     
     return vectors
 
+def get_vectors(params):
+    '''Assumes each entry is some root of unity'''
+
+    vectors = [
+                    np.array([1,1,1,1,1,1], dtype=complex),
+                    np.array([1, np.exp(2*np.pi*1j*params[0]), np.exp(2*np.pi*1j*params[1]), np.exp(2*np.pi*1j*(params[0]+params[1])), np.exp(2*np.pi*1j*params[2]), np.exp(2*np.pi*1j*(params[0]+params[2]))], dtype=complex),
+                    np.array([1, np.exp(2*np.pi*1j*params[3]), np.exp(2*np.pi*1j*params[4]), np.exp(2*np.pi*1j*(params[3]+params[4])), np.exp(2*np.pi*1j*params[5]), np.exp(2*np.pi*1j*(params[3]+params[5]))], dtype=complex),
+                    np.array([1, np.exp(2*np.pi*1j*params[6]), np.exp(2*np.pi*1j*params[7]), np.exp(2*np.pi*1j*(params[6]+params[7])), np.exp(2*np.pi*1j*params[8]), np.exp(2*np.pi*1j*(params[6]+params[8]))], dtype=complex),
+                    np.array([1, np.exp(2*np.pi*1j*params[9]), np.exp(2*np.pi*1j*params[10]), np.exp(2*np.pi*1j*(params[9]+params[10])), np.exp(2*np.pi*1j*params[11]), np.exp(2*np.pi*1j*(params[9]+params[11]))], dtype=complex),
+                    np.array([1, np.exp(2*np.pi*1j*params[12]), np.exp(2*np.pi*1j*params[13]), np.exp(2*np.pi*1j*(params[12]+params[13])), np.exp(2*np.pi*1j*params[14]), np.exp(2*np.pi*1j*(params[12]+params[14]))], dtype=complex),
+               ]
+    return vectors
+
 def loss_phase(params):
     '''Loss function to find the optimal phases for d = 6'''
 
@@ -115,53 +128,182 @@ def loss_phase(params):
 
     return inner_products
 
-def random_gen(num_params=40):
+def random_gen(num_params=15):
     '''Generate random parameters'''
-    return np.random.uniform(-1, 1, num_params)
+    return np.random.uniform(-1, 1, size=(num_params))
     
-def optimize_phase(tol=1e-6, x0=None):
+def optimize_phase(tol=1e-10, x0=None):
     '''Minimize the loss function of sum of abs value of inner products to find the optimal phases'''
-    x_best, loss_best = trabbit(loss_func=loss_phase, random_gen=random_gen, alpha=1, tol=tol, temperature=0.01, x0_ls=[x0])
+    if x0 is None:
+        x_best, loss_best = trabbit(loss_func=loss_phase, random_gen=random_gen, alpha=1, tol=tol, temperature=0.01)
+    else:
+        x_best, loss_best = trabbit(loss_func=loss_phase, random_gen=random_gen, alpha=1, tol=tol, temperature=0.01, x0_ls=[x0])
     print(f'best loss: {loss_best}')
     print(f'best params: {list(x_best)}')
     return x_best, loss_best
 
+## OLD attempts to numerically solve for the remaining parameters. ##
+
+def loss_phase_remaining(params):
+    if np.isclose(params[1], 0, atol=1e-10):
+        params[1] == 1
+    if np.isclose(params[3], 0, atol=1e-10):
+        params[3] == 1
+    if np.isclose(params[5], 0, atol=1e-10):
+        params[5] == 1
+    if np.isclose(params[7], 0, atol=1e-10):
+        params[7] == 1
+    param0 = np.exp(2*np.pi*1j*np.sqrt(int(params[0])/int(params[1])))
+    param1 = np.exp(2*np.pi*1j*np.sqrt(int(params[2])/int(params[3])))
+    param2 = np.exp(2*np.pi*1j*np.sqrt(int(params[4])/int(params[5])))
+    param3 = np.exp(2*np.pi*1j*np.sqrt(int(params[6])/int(params[7])))
+    params_tot = [param0, 1/3, -1/3, 0.5, -1, 0,param1, 2/3, 1/3, param2, 4/3, -1/3, param3, 2/3, 1/3]
+    return loss_phase(params_tot)
+
+def random_remaining_gen(num_params=8):
+    '''Generate random parameters'''
+    return np.random.uniform(1, 10, size=(num_params))
+
+def optimize_remaining(tol=1e-10):
+    x_best, loss_best = trabbit(loss_func=loss_phase_remaining, random_gen=random_remaining_gen, alpha=1, tol=tol, temperature=0.01)
+    print(f'best loss: {loss_best}')
+    print(f'best params: {list(x_best)}')
+    return x_best, loss_best
+
+## sympy code ##
+import sympy as sp
+
+def get_inner_prods(numerical_params=None, solve=False):
+    '''Compute symbolic inner products between vectors, either completely symbolically or with numerical values for some of the parameters.
+
+    Params:
+        numerical_params: list of numerical values for some of the parameters. If None, then purely symbolic params used.
+        solve: whether to solve analytically for the remaining parameters (if numerical_params is not None). NOTE: this did not ever finish running, so I wouldn't use it but am leaving it here for reference.
+
+    Returns:
+        results: symbolic matrix of inner products between vectors
+
+    '''
+
+    # start indexing from 0
+    params = sp.symbols('p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14', real=True)
+
+    vectors = [
+        sp.Matrix([1, 1, 1, 1, 1, 1]),
+        sp.Matrix([1, sp.exp(2*sp.pi*sp.I*params[0]), sp.exp(2*sp.pi*sp.I*params[1]), sp.exp(2*sp.pi*sp.I*(params[0]+params[1])), sp.exp(2*sp.pi*sp.I*params[2]), sp.exp(2*sp.pi*sp.I*(params[0]+params[2]))]),
+        sp.Matrix([1, sp.exp(2*sp.pi*sp.I*params[3]), sp.exp(2*sp.pi*sp.I*params[4]), sp.exp(2*sp.pi*sp.I*(params[3]+params[4])), sp.exp(2*sp.pi*sp.I*params[5]), sp.exp(2*sp.pi*sp.I*(params[3]+params[5]))]),
+        sp.Matrix([1, sp.exp(2*sp.pi*sp.I*params[6]), sp.exp(2*sp.pi*sp.I*params[7]), sp.exp(2*sp.pi*sp.I*(params[6]+params[7])), sp.exp(2*sp.pi*sp.I*params[8]), sp.exp(2*sp.pi*sp.I*(params[6]+params[8]))]),
+        sp.Matrix([1, sp.exp(2*sp.pi*sp.I*params[9]), sp.exp(2*sp.pi*sp.I*params[10]), sp.exp(2*sp.pi*sp.I*(params[9]+params[10])), sp.exp(2*sp.pi*sp.I*params[11]), sp.exp(2*sp.pi*sp.I*(params[9]+params[11]))]),
+        sp.Matrix([1, sp.exp(2*sp.pi*sp.I*params[12]), sp.exp(2*sp.pi*sp.I*params[13]), sp.exp(2*sp.pi*sp.I*(params[12]+params[13])), sp.exp(2*sp.pi*sp.I*params[14]), sp.exp(2*sp.pi*sp.I*(params[12]+params[14]))]),
+    ]
+    
+    n = len(vectors)
+    results = sp.Matrix.zeros(n, n)
+    for i in range(n):
+        for j in range(i+1, n):
+            results[i, j] = vectors[i].dot(vectors[j].conjugate().T)
+            results[j, i] = results[i, j].conjugate()
+
+    def custom_chop(expr, tol=1e-15):
+        '''Removes small values (below tol) in sympy expressions in order to simplify numerical + symbolic expressions'''
+        if expr is None:
+            print("Encountered None expression")
+            return None
+        elif expr.is_Number:
+            if abs(expr) < tol:
+                return sp.Integer(0)
+            else:
+                return expr
+        elif expr.is_Symbol:
+            return expr
+        else:
+            if not expr.args:  # If expr.args is empty
+                return expr
+            chopped_args = [custom_chop(arg, tol) for arg in expr.args]
+            if None in chopped_args:
+                print("None found in arguments of:", expr)
+                return None
+            return expr.func(*chopped_args)
+
+    # if numerical values are not given, then just print out the expressions
+    if numerical_params is None:
+        for i in range(n):
+            print('\Vec{I}'+f'_{i}'+ ' = \\begin{bmatrix}')
+            for j in range(n):
+                expr = results[i, j]
+                expr = sp.simplify(expr)
+                sp.print_latex(expr)
+                print('\\\\')
+            print('\\end{bmatrix},\\\\')
+
+    else: # substitute in the values we have
+         # set specific numerical values to some of the params
+        test_params = []
+        for i in range(len(params)):
+            if i in [0, 6, 9, 12]:
+                test_params.append(params[i])
+            else:
+                test_params.append(numerical_params[i])
+
+        # apply to results
+        results = results.subs({params[i]: test_params[i] for i in range(len(params))})
+
+        for i in range(n):
+            print('\Vec{I}'+f'_{i}'+ ' = \\begin{bmatrix}')
+            for j in range(n):
+                expr = results[i, j]
+                expr = sp.N(expr)
+                expr = custom_chop(expr)
+                expr = sp.simplify(expr)
+                sp.print_latex(expr)
+                print('\\\\')
+            print('\\end{bmatrix},\\\\')
+
+    if solve and numerical_params is not None:
+        # solve for values that make sum of abs value of inner products = 0
+        results = results.subs({params[i]: numerical_params[i] for i in range(len(params))})
+        # print out columns
+        sp.pprint(sp.N(results))
+
+        # solve for values that make sum of abs value of inner products = 0
+        total_sum = 0
+        for i in range(n):
+            for j in range(n):
+                total_sum += sp.Abs(results[i, j])
+
+        # input test params into total_sum
+        print('total_sum: ')
+        total_sum = total_sum.subs({params[i]: test_params[i] for i in range(len(params))})
+
+        remaining_params = sp.symbols('p0 p6 p9 p12', real=True)
+
+        # Solve the equation (if it's solvable)
+        solution = sp.nsolve(total_sum,remaining_params )
+
+        print(f'solution: {solution}')
+
+    
+    return results    
+
 if __name__ == '__main__':
-    # initial_vectors = np.array([
-    #     [1, -1, 1, -1, 1, -1],
-    #     [1, -1, -1, 1, 1, -1],
-    #     [1, -1, -1, 1, -1, 1],
-    #     [1, -1, 1, -1, -1, 1],
-    #     [1, 1, -1, -1, 1, 1],
-    #     [1, 1, 1, 1, -1, -1]
-    # ]).astype(float)
 
-    # old_phase = get_old_phase()
-    # check_orthogonal(old_phase)
-    # print(old_phase)
+    ## solution obtained through optimize_phase() ##
 
-    # second_vectors = np.array([
-    #     [1, 1, 1, 1, 1, 1],
-    #     [1, -1, np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3)],
-    #     [1, -1, -np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3)],
-    #     [1, -1, np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3)],
-    #     [1, -1, -np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3), -np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3)]
-    #     ])
+    # best_loss_numerical = 8.346005000999512e-07
+    # best_params_numerical = [0.3073524627378583, 0.3333333179399618, -0.33333334259706254, 0.4999999920193058, -1.0000000130072773, -1.2082227449358706e-08, -0.02563931056721057, 0.6666666524787896, 0.33333331987509573, 0.8073524630069947, 1.3333333168849828, -0.33333334966782724, -0.5256393104295811, 0.666666651145216, 0.3333333221305492]
+    
+    # loss after substituting in for all but p0, p6, p9. p12
+    # best_loss = 7.667367120048474e-09
+    # best_params_numerical = [0.3073524627378583, 0.3333333179399618, -0.33333334259706254, 0.4999999920193058, -1.0000000130072773, -1.2082227449358706e-08, -0.02563931056721057, 0.6666666524787896, 0.33333331987509573, 0.8073524630069947, 1.3333333168849828, -0.33333334966782724, -0.5256393104295811, 0.666666651145216, 0.3333333221305492]
+    best_params_approx = [0.3073524627378583, 1/3, -1/3, 1/2, -1, 0, -0.02563931056721057, 2/3, 1/3, 0.8073524630069947, 4/3, -1/3, -0.5256393104295811, 2/3, 1/3]
 
-    # check_constraints_and_orthogonality(second_vectors)
+    get_inner_prods(best_params_approx, solve=True)
 
-    x0 = [-0.26957523753194196, 1.2255067628584213, -1.8140745726231078, 0.5885677693016419, 0.3056393212405134, 1.5853919369836418, -1.7656582706665025, 0.18026631980690383, -1.0000000021188098, 0.9944961719952249, 0.9944961592711796, 0.9944961802796902, -0.7107111105850151, -1.2279809900976428, -0.326568572070583, 1.5545495251219525, 0.5792472360067527, -0.8989998649828175, 0.3166079342532708, 0.5823919132861747, 0.8996296942917451, -1.2898148534195002, 1.005664318472053, 0.28415050815715914, -1.019983235511904, -0.007356466426700959, -0.5464310628467627, 0.5537875102161702, -2.8600226218100746e-09, 1.1214375020607408, 1.121437509414354, 1.1214375329993491, 0.8496152737170141, -0.3668087016935599, -0.8036196417378422, 1.170428324918717, -0.6924576004755217, -1.3212094808403232, -1.0342619236156319, 2.355471380541379]
+    # actual best params determined with get_inner_prods() 
+    # best_params = [0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]
+    
 
-    best_params, best_loss = optimize_phase(tol=1e-10, x0=x0)
-
-    # best_loss = 9.440345514106494e-07
-    # best_params = [-0.1268860616808698, 0.5886238937550582, -0.45847894057688376, -0.1301452181425787, -1.0000003228778174, -1.3451340877544036, -1.345133905794467, -1.3451341168951334, 0.14595266412945068, 0.3838792083640446, -1.0656074601943992, 0.6817281399774296, -0.12688569597412505, -1.9868248626837408, 0.8252053330405361, 1.1616195280756307, 0.14595295594403637, -0.3611445240551306, -0.24961751250677564, 0.6107618844035959, -0.923721498017154, 0.34138732374634495, -1.9095298298805803, 1.5681420397075128, -1.2751183983522213e-08, 0.25461790276576135, 0.25461786277002146, 0.25461785417874, 1.062528779918951, 0.1944171811809395, 1.26447448399162, -1.4588914720163297, -0.9237211925292237, -0.7103536317989507, -0.2379699377925436, 0.9483235116043163, 1.0625288436738816, -2.130928609568798, 1.0939959280252247, 1.036933042184377]
-
-    # best_loss=4.249493263456608e-08
-    # best_params= [-0.26957523753194196, 1.2255067628584213, -1.8140745726231078, 0.5885677693016419, 0.3056393212405134, 1.5853919369836418, -1.7656582706665025, 0.18026631980690383, -1.0000000021188098, 0.9944961719952249, 0.9944961592711796, 0.9944961802796902, -0.7107111105850151, -1.2279809900976428, -0.326568572070583, 1.5545495251219525, 0.5792472360067527, -0.8989998649828175, 0.3166079342532708, 0.5823919132861747, 0.8996296942917451, -1.2898148534195002, 1.005664318472053, 0.28415050815715914, -1.019983235511904, -0.007356466426700959, -0.5464310628467627, 0.5537875102161702, -2.8600226218100746e-09, 1.1214375020607408, 1.121437509414354, 1.1214375329993491, 0.8496152737170141, -0.3668087016935599, -0.8036196417378422, 1.170428324918717, -0.6924576004755217, -1.3212094808403232, -1.0342619236156319, 2.355471380541379]
-
-    vectors = get_vectors(best_params)
-    print(vectors)
-    check_constraints_and_orthogonality(vectors)
-
-
+    # vectors = get_vectors(best_params)
+    # for i in range(len(vectors)):
+    #     print(f'vectors[{i}]: {vectors[i]}')
+    # check_constraints_and_orthogonality(vectors)

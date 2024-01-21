@@ -1,0 +1,84 @@
+\Vec{I}_0 &= \begin{bmatrix}
+0
+\\
+\left(1 + e^{- 2/3 i \pi} + e^{2/3 i \pi}\right) e^{- 2 i \pi p_{0}}
+\\
+0
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{- i \pi \left(2 p_{6} + 2\right)}
+\\
+\left(1 + e^{10/3 i \pi} + e^{8/3 i \pi}\right) e^{- i \pi \left(2 p_{9} + 8/3\right)}
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{- i \pi \left(2 p_{12} + 2\right)}
+\\
+\end{bmatrix},\\
+\Vec{I}_1 &= \begin{bmatrix}
+e^{2 i \pi p_{0}} + e^{2 i \pi \left(p_{0} - 1/3\right)} + e^{2 i \pi \left(p_{0} + 1/3\right)}
+\\
+0
+\\
+- e^{2 i \pi p_{0}} - e^{2 i \pi \left(p_{0} - 1/3\right)} - e^{2 i \pi \left(p_{0} + 1/3\right)}
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{i \pi \left(2 p_{0} - 2 p_{6} - 2\right)}
+\\
+3 e^{2 i \pi p_{0} - 2 i \pi p_{9}} + 3
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{i \pi \left(2 p_{0} - 2 p_{12} - 2\right)}
+\\
+\end{bmatrix},\\
+\Vec{I}_2 &= \begin{bmatrix}
+0
+\\
+- \left(1 + e^{- 2/3 i \pi} + e^{2/3 i \pi}\right) e^{- 2 i \pi p_{0}}
+\\
+0
+\\
+\left(-1 - e^{2/3 i \pi} - e^{4/3 i \pi}\right) e^{- i \pi \left(2 p_{6} + 2\right)}
+\\
+\left(-1 - e^{8/3 i \pi} - e^{10/3 i \pi}\right) e^{- i \pi \left(2 p_{9} + 8/3\right)}
+\\
+\left(-1 - e^{2/3 i \pi} - e^{4/3 i \pi}\right) e^{- i \pi \left(2 p_{12} + 2\right)}
+\\
+\end{bmatrix},\\
+\Vec{I}_3 &= \begin{bmatrix}
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{2 i \pi p_{6}}
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{2 i \pi \left(- p_{0} + p_{6}\right)}
+\\
+\left(-1 - e^{2/3 i \pi} - e^{4/3 i \pi}\right) e^{2 i \pi p_{6}}
+\\
+0
+\\
+\left(1 + e^{4/3 i \pi} + e^{8/3 i \pi}\right) e^{i \pi \left(2 p_{6} - 2 p_{9} - 4/3\right)}
+\\
+3 e^{- 2 i \pi p_{12} + 2 i \pi p_{6}} + 3
+\\
+\end{bmatrix},\\
+\Vec{I}_4 &= \begin{bmatrix}
+e^{2 i \pi p_{9}} + e^{2 i \pi \left(p_{9} - 1/3\right)} + e^{2 i \pi \left(p_{9} + 4/3\right)}
+\\
+3 e^{- 2 i \pi p_{0} + 2 i \pi p_{9}} + 3
+\\
+- e^{2 i \pi p_{9}} - e^{2 i \pi \left(p_{9} - 1/3\right)} - e^{2 i \pi \left(p_{9} + 4/3\right)}
+\\
+\left(1 + e^{4/3 i \pi} + e^{8/3 i \pi}\right) e^{i \pi \left(- 2 p_{6} + 2 p_{9} - 4/3\right)}
+\\
+0
+\\
+\left(1 + e^{4/3 i \pi} + e^{8/3 i \pi}\right) e^{i \pi \left(- 2 p_{12} + 2 p_{9} - 4/3\right)}
+\\
+\end{bmatrix},\\
+\Vec{I}_5 &= \begin{bmatrix}
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{2 i \pi p_{12}}
+\\
+\left(1 + e^{4/3 i \pi} + e^{2/3 i \pi}\right) e^{2 i \pi \left(- p_{0} + p_{12}\right)}
+\\
+\left(-1 - e^{2/3 i \pi} - e^{4/3 i \pi}\right) e^{2 i \pi p_{12}}
+\\
+3 e^{2 i \pi p_{12} - 2 i \pi p_{6}} + 3
+\\
+\left(1 + e^{4/3 i \pi} + e^{8/3 i \pi}\right) e^{i \pi \left(2 p_{12} - 2 p_{9} - 4/3\right)}
+\\
+0
+\\
+\end{bmatrix},\\

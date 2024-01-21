@@ -1,0 +1,84 @@
+\Vec{I}_0 = \begin{bmatrix}
+0
+\\
+e^{- 2 i \pi p_{0} - 2 i \pi p_{1}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{2}} + 1 + e^{- 2 i \pi p_{2}} + e^{- 2 i \pi p_{1}} + e^{- 2 i \pi p_{0}}
+\\
+e^{- 2 i \pi p_{3} - 2 i \pi p_{4}} + e^{- 2 i \pi p_{3} - 2 i \pi p_{5}} + 1 + e^{- 2 i \pi p_{5}} + e^{- 2 i \pi p_{4}} + e^{- 2 i \pi p_{3}}
+\\
+e^{- 2 i \pi p_{6} - 2 i \pi p_{7}} + e^{- 2 i \pi p_{6} - 2 i \pi p_{8}} + 1 + e^{- 2 i \pi p_{8}} + e^{- 2 i \pi p_{7}} + e^{- 2 i \pi p_{6}}
+\\
+e^{- 2 i \pi p_{10} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{11} - 2 i \pi p_{9}} + 1 + e^{- 2 i \pi p_{9}} + e^{- 2 i \pi p_{11}} + e^{- 2 i \pi p_{10}}
+\\
+e^{- 2 i \pi p_{12} - 2 i \pi p_{13}} + e^{- 2 i \pi p_{12} - 2 i \pi p_{14}} + 1 + e^{- 2 i \pi p_{14}} + e^{- 2 i \pi p_{13}} + e^{- 2 i \pi p_{12}}
+\\
+\end{bmatrix},\\
+\Vec{I}_1 = \begin{bmatrix}
+e^{2 i \pi p_{0}} + e^{2 i \pi p_{1}} + e^{2 i \pi p_{2}} + e^{2 i \pi \left(p_{0} + p_{1}\right)} + e^{2 i \pi \left(p_{0} + p_{2}\right)} + 1
+\\
+0
+\\
+e^{2 i \pi p_{0} - 2 i \pi p_{3}} + e^{2 i \pi p_{1} - 2 i \pi p_{4}} + e^{2 i \pi p_{2} - 2 i \pi p_{5}} + e^{2 i \pi p_{0} + 2 i \pi p_{1} - 2 i \pi p_{3} - 2 i \pi p_{4}} + e^{2 i \pi p_{0} + 2 i \pi p_{2} - 2 i \pi p_{3} - 2 i \pi p_{5}} + 1
+\\
+e^{2 i \pi p_{0} - 2 i \pi p_{6}} + e^{2 i \pi p_{1} - 2 i \pi p_{7}} + e^{2 i \pi p_{2} - 2 i \pi p_{8}} + e^{2 i \pi p_{0} + 2 i \pi p_{1} - 2 i \pi p_{6} - 2 i \pi p_{7}} + e^{2 i \pi p_{0} + 2 i \pi p_{2} - 2 i \pi p_{6} - 2 i \pi p_{8}} + 1
+\\
+e^{2 i \pi p_{0} - 2 i \pi p_{9}} + e^{2 i \pi p_{1} - 2 i \pi p_{10}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{2}} + e^{2 i \pi p_{0} + 2 i \pi p_{1} - 2 i \pi p_{10} - 2 i \pi p_{9}} + e^{2 i \pi p_{0} - 2 i \pi p_{11} + 2 i \pi p_{2} - 2 i \pi p_{9}} + 1
+\\
+e^{2 i \pi p_{0} - 2 i \pi p_{12}} + e^{2 i \pi p_{1} - 2 i \pi p_{13}} + e^{- 2 i \pi p_{14} + 2 i \pi p_{2}} + e^{2 i \pi p_{0} + 2 i \pi p_{1} - 2 i \pi p_{12} - 2 i \pi p_{13}} + e^{2 i \pi p_{0} - 2 i \pi p_{12} - 2 i \pi p_{14} + 2 i \pi p_{2}} + 1
+\\
+\end{bmatrix},\\
+\Vec{I}_2 = \begin{bmatrix}
+e^{2 i \pi p_{3}} + e^{2 i \pi p_{4}} + e^{2 i \pi p_{5}} + e^{2 i \pi \left(p_{3} + p_{4}\right)} + e^{2 i \pi \left(p_{3} + p_{5}\right)} + 1
+\\
+e^{- 2 i \pi p_{0} + 2 i \pi p_{3}} + e^{- 2 i \pi p_{1} + 2 i \pi p_{4}} + e^{- 2 i \pi p_{2} + 2 i \pi p_{5}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{1} + 2 i \pi p_{3} + 2 i \pi p_{4}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{2} + 2 i \pi p_{3} + 2 i \pi p_{5}} + 1
+\\
+0
+\\
+e^{2 i \pi p_{3} - 2 i \pi p_{6}} + e^{2 i \pi p_{4} - 2 i \pi p_{7}} + e^{2 i \pi p_{5} - 2 i \pi p_{8}} + e^{2 i \pi p_{3} + 2 i \pi p_{4} - 2 i \pi p_{6} - 2 i \pi p_{7}} + e^{2 i \pi p_{3} + 2 i \pi p_{5} - 2 i \pi p_{6} - 2 i \pi p_{8}} + 1
+\\
+e^{- 2 i \pi p_{10} + 2 i \pi p_{4}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{5}} + e^{2 i \pi p_{3} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{10} + 2 i \pi p_{3} + 2 i \pi p_{4} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{3} + 2 i \pi p_{5} - 2 i \pi p_{9}} + 1
+\\
+e^{- 2 i \pi p_{12} + 2 i \pi p_{3}} + e^{- 2 i \pi p_{13} + 2 i \pi p_{4}} + e^{- 2 i \pi p_{14} + 2 i \pi p_{5}} + e^{- 2 i \pi p_{12} - 2 i \pi p_{13} + 2 i \pi p_{3} + 2 i \pi p_{4}} + e^{- 2 i \pi p_{12} - 2 i \pi p_{14} + 2 i \pi p_{3} + 2 i \pi p_{5}} + 1
+\\
+\end{bmatrix},\\
+\Vec{I}_3 = \begin{bmatrix}
+e^{2 i \pi p_{6}} + e^{2 i \pi p_{7}} + e^{2 i \pi p_{8}} + e^{2 i \pi \left(p_{6} + p_{7}\right)} + e^{2 i \pi \left(p_{6} + p_{8}\right)} + 1
+\\
+e^{- 2 i \pi p_{0} + 2 i \pi p_{6}} + e^{- 2 i \pi p_{1} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{2} + 2 i \pi p_{8}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{1} + 2 i \pi p_{6} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{2} + 2 i \pi p_{6} + 2 i \pi p_{8}} + 1
+\\
+e^{- 2 i \pi p_{3} + 2 i \pi p_{6}} + e^{- 2 i \pi p_{4} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{5} + 2 i \pi p_{8}} + e^{- 2 i \pi p_{3} - 2 i \pi p_{4} + 2 i \pi p_{6} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{3} - 2 i \pi p_{5} + 2 i \pi p_{6} + 2 i \pi p_{8}} + 1
+\\
+0
+\\
+e^{- 2 i \pi p_{10} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{8}} + e^{2 i \pi p_{6} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{10} + 2 i \pi p_{6} + 2 i \pi p_{7} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{6} + 2 i \pi p_{8} - 2 i \pi p_{9}} + 1
+\\
+e^{- 2 i \pi p_{12} + 2 i \pi p_{6}} + e^{- 2 i \pi p_{13} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{14} + 2 i \pi p_{8}} + e^{- 2 i \pi p_{12} - 2 i \pi p_{13} + 2 i \pi p_{6} + 2 i \pi p_{7}} + e^{- 2 i \pi p_{12} - 2 i \pi p_{14} + 2 i \pi p_{6} + 2 i \pi p_{8}} + 1
+\\
+\end{bmatrix},\\
+\Vec{I}_4 = \begin{bmatrix}
+e^{2 i \pi p_{10}} + e^{2 i \pi p_{11}} + e^{2 i \pi p_{9}} + e^{2 i \pi \left(p_{10} + p_{9}\right)} + e^{2 i \pi \left(p_{11} + p_{9}\right)} + 1
+\\
+e^{- 2 i \pi p_{0} + 2 i \pi p_{9}} + e^{- 2 i \pi p_{1} + 2 i \pi p_{10}} + e^{2 i \pi p_{11} - 2 i \pi p_{2}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{1} + 2 i \pi p_{10} + 2 i \pi p_{9}} + e^{- 2 i \pi p_{0} + 2 i \pi p_{11} - 2 i \pi p_{2} + 2 i \pi p_{9}} + 1
+\\
+e^{2 i \pi p_{10} - 2 i \pi p_{4}} + e^{2 i \pi p_{11} - 2 i \pi p_{5}} + e^{- 2 i \pi p_{3} + 2 i \pi p_{9}} + e^{2 i \pi p_{10} - 2 i \pi p_{3} - 2 i \pi p_{4} + 2 i \pi p_{9}} + e^{2 i \pi p_{11} - 2 i \pi p_{3} - 2 i \pi p_{5} + 2 i \pi p_{9}} + 1
+\\
+e^{2 i \pi p_{10} - 2 i \pi p_{7}} + e^{2 i \pi p_{11} - 2 i \pi p_{8}} + e^{- 2 i \pi p_{6} + 2 i \pi p_{9}} + e^{2 i \pi p_{10} - 2 i \pi p_{6} - 2 i \pi p_{7} + 2 i \pi p_{9}} + e^{2 i \pi p_{11} - 2 i \pi p_{6} - 2 i \pi p_{8} + 2 i \pi p_{9}} + 1
+\\
+0
+\\
+e^{2 i \pi p_{10} - 2 i \pi p_{13}} + e^{2 i \pi p_{11} - 2 i \pi p_{14}} + e^{- 2 i \pi p_{12} + 2 i \pi p_{9}} + e^{2 i \pi p_{10} - 2 i \pi p_{12} - 2 i \pi p_{13} + 2 i \pi p_{9}} + e^{2 i \pi p_{11} - 2 i \pi p_{12} - 2 i \pi p_{14} + 2 i \pi p_{9}} + 1
+\\
+\end{bmatrix},\\
+\Vec{I}_5 = \begin{bmatrix}
+e^{2 i \pi p_{12}} + e^{2 i \pi p_{13}} + e^{2 i \pi p_{14}} + e^{2 i \pi \left(p_{12} + p_{13}\right)} + e^{2 i \pi \left(p_{12} + p_{14}\right)} + 1
+\\
+e^{- 2 i \pi p_{0} + 2 i \pi p_{12}} + e^{- 2 i \pi p_{1} + 2 i \pi p_{13}} + e^{2 i \pi p_{14} - 2 i \pi p_{2}} + e^{- 2 i \pi p_{0} - 2 i \pi p_{1} + 2 i \pi p_{12} + 2 i \pi p_{13}} + e^{- 2 i \pi p_{0} + 2 i \pi p_{12} + 2 i \pi p_{14} - 2 i \pi p_{2}} + 1
+\\
+e^{2 i \pi p_{12} - 2 i \pi p_{3}} + e^{2 i \pi p_{13} - 2 i \pi p_{4}} + e^{2 i \pi p_{14} - 2 i \pi p_{5}} + e^{2 i \pi p_{12} + 2 i \pi p_{13} - 2 i \pi p_{3} - 2 i \pi p_{4}} + e^{2 i \pi p_{12} + 2 i \pi p_{14} - 2 i \pi p_{3} - 2 i \pi p_{5}} + 1
+\\
+e^{2 i \pi p_{12} - 2 i \pi p_{6}} + e^{2 i \pi p_{13} - 2 i \pi p_{7}} + e^{2 i \pi p_{14} - 2 i \pi p_{8}} + e^{2 i \pi p_{12} + 2 i \pi p_{13} - 2 i \pi p_{6} - 2 i \pi p_{7}} + e^{2 i \pi p_{12} + 2 i \pi p_{14} - 2 i \pi p_{6} - 2 i \pi p_{8}} + 1
+\\
+e^{- 2 i \pi p_{10} + 2 i \pi p_{13}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{14}} + e^{2 i \pi p_{12} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{10} + 2 i \pi p_{12} + 2 i \pi p_{13} - 2 i \pi p_{9}} + e^{- 2 i \pi p_{11} + 2 i \pi p_{12} + 2 i \pi p_{14} - 2 i \pi p_{9}} + 1
+\\
+0
+\\
+\end{bmatrix},\\

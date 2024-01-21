@@ -1,0 +1,84 @@
+\Vec{I}_0 &= \begin{bmatrix}
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+\end{bmatrix},\\
+\Vec{I}_1 &= \begin{bmatrix}
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+3 e^{2 i \pi (p_{0} -  p_{9})} + 3
+\\
+0
+\\
+\end{bmatrix},\\
+\Vec{I}_2 &= \begin{bmatrix}
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+\end{bmatrix},\\
+\Vec{I}_3 &= \begin{bmatrix}
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+3 e^{- 2 i \pi (p_{12} - p_{6})} + 3
+\\
+\end{bmatrix},\\
+\Vec{I}_4 &= \begin{bmatrix}
+0
+\\
+3 e^{- 2 i \pi (p_{0} - p_{9})} + 3
+\\
+0
+\\
+0
+\\
+0
+\\
+0
+\\
+\end{bmatrix},\\
+\Vec{I}_5 &= \begin{bmatrix}
+0
+\\
+0
+\\
+0
+\\
+3 e^{2 i \pi (p_{12} - p_{6})}
+\\
+0
+\\
+0
+\\
+\end{bmatrix},\\

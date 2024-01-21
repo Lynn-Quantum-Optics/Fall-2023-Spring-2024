@@ -1,5 +1,8 @@
 Hi, these are some notes by Oscar on his code for thesis. I will be adding more clarifications as I go on in the spring to make this code as useful to future generations as possible. :)
 
+## 1/20/24
+- successfully found phase class for symmetric basis!!!!!! see new_esym_6.py. in optimize_phase() used trabbit and phase explicitly an eigenstate of particle exchange minimizing sum of abs value of inner prods; then used get_inner_prods() to evaluate the inner prods of the parametrized vectors I started with and when I substituted in my adapted numerical results from optimize_phase(). See inner_prod0, inner_prod1, inner_prod2, and final_phase for a record of the latex outputs.
+
 ## 1/19/24
 - realized that by "symmetric basis", we mean eigenstate of particle exchange. played around with sample phase classes and found one numerically that satisfies orthogonality of the states up to 7e-9, and the eigenstate of exchange beyond 1e-33 (since they were specficially constructed to be eigenstates). all this code is in new_esym_6.py.
 
