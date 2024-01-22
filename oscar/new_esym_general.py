@@ -1,122 +1,12 @@
 # file to generalize new_esym_6.py
 import numpy as np
-from copy import deepcopy
+from functools import partial
 
-def OLD_correlation_classes(d):
-    '''Returns correlation classes for a given even d'''
+def correlation_classes(d):
+    '''Returns the correlation classes for a given d. Assumes d is even.'''
 
     assert d % 2 == 0, f'd must be even. Your d is {d}'
 
-    def valid_cc(correlation_i):
-        '''Returns whether a correlation class is valid or not.'''
-        # get all pairs
-        pairs = []
-        for pair in correlation_i:
-            pairs.append(pair)
-            pairs.append((pair[1], pair[0]))
-        # check that all pairs are unique
-        if len(pairs) != len(set(pairs)):
-            return False
-        # check that all pairs are of length d
-        if len(pairs) != d:
-            return False
-        # check that there are no repeated elements
-        for pair in pairs:
-            if pair[0] == pair[1]:
-                return False
-        return True
-
-    # get all correlation classes
-    correlation_classes = [[] for _ in range(d)]
-    for i in range(d):
-        correlation_classes[0].append((i, i)) # add trivial correlation class
-
-    # get all correlation classes
-    used_pairs = []
-    for i in range(1,d):
-        correlation_i = []
-        exit_outer_loop = False  # flag for whether to exit the outer loop
-        for j in range(d):
-            if exit_outer_loop:
-                break
-            for k in range(d):
-                if len(correlation_i) == d:
-                    # append to correlation classes
-                    correlation_classes[i] = correlation_i
-                    exit_outer_loop = True  # exit to i loop
-                    break
-                if j != k:
-                    # get pair and reverse
-                    pair = (j, k)
-                    rev_pair = (k, j)
-                    # see if pair is already used
-                    if (pair not in used_pairs and rev_pair not in used_pairs) and len(correlation_i) < d:
-                        # print(f'pair = {pair}')
-                        # to ensure entanglement, we need to make sure that the neither j nor k are in the correlation_i
-                        if len(correlation_i) == 0:
-                            print(f'len 0, adding to correlation_{i}: {pair}')
-                            # add pair and pair reversed
-                            correlation_i.append(pair)
-                            correlation_i.append(rev_pair)
-                            # add to used pairs
-                            used_pairs.append(pair)
-                            used_pairs.append(rev_pair)
-                        else:
-                            # make sure that neither j nor k are in correlation_i for entanglement
-                            for p in correlation_i:
-                                print(f'pair inside = {p}, {j}, {k}')
-                                no_element_in_p = True
-                                if j in p or k in p:
-                                    no_element_in_p = False
-                                    break
-                            # now confirm that if we add this pair, there is a valid solution to the end
-                            test_correlation_i = correlation_i + [pair, rev_pair]
-                            # from wherever j, k are continue iterating
-                            for l in range(j, d):
-                                for m in range(d):
-                                    if l != m:
-                                        # get pair and reverse
-                                        test_pair = (l, m)
-                                        test_rev_pair = (m, l)
-                                        # see if pair is already used
-                                        if (test_pair not in used_pairs and test_rev_pair not in used_pairs) and len(test_correlation_i) < d:
-                                            pass
-                                          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                            if no_element_in_p:
-                                print(f'adding to correlation_{i}: {pair}')
-                                # add pair and pair reversed
-                                correlation_i.append(pair)
-                                correlation_i.append(rev_pair)
-                                # add to used pairs
-                                used_pairs.append(pair)
-                                used_pairs.append(rev_pair)
-                                print(f'len correlation_{i} = {len(correlation_i)}, {j}, {k}')
-                                if len(correlation_i) == d:
-                                    # append to correlation classes
-                                    correlation_classes[i] = correlation_i
-                                    exit_outer_loop = True
-
-    # check that all correlation classes are of length d
-    for i in range(d):
-        print(f'correlation class {i}: {correlation_classes[i]}')
-        assert len(correlation_classes[i]) == d, f'Correlation classes are not of length d. Your correlation class {i} is {correlation_classes[i]}'
-
-def correlation_classes(d):
-     # get all correlation classes
     correlation_classes = [[] for _ in range(d)]
     for i in range(d):
         correlation_classes[0].append((i, i)) # add trivial correlation class
@@ -203,11 +93,243 @@ def correlation_classes(d):
 
     return correlation_classes
     
+from new_esym_6 import check_orthogonal, check_constraints_and_orthogonality
+from oscars_toolbox.trabbit import trabbit
+## learning the phases ##
+def get_vectors(params):
+    '''Assumes each entry is some root of unity. num params per vector is d//2, so total params is (d-1)(d//2)'''
+
+    # extract the dimension
+    d = (1+np.sqrt(1+8*len(params)))*0.5
+    d = int(d)
+
+    # initialize with the trivial case of no phase
+    vectors = [np.ones(d, dtype=complex)]
+
+    # for each remaining vector add the phase
+    param_index = 0
+    for _ in range(1,d):
+        vec_i = [1]
+        for j in range(d-1):
+            if param_index >= len(params):
+                break
+            if j > 0 and j%2 == 0:
+                # get the phase
+                vec_i.append(np.exp(2*np.pi*1j*(params[param_index]+params[eigenval_index])))
+                param_index += 1
+            else:
+                if j==0:
+                    eigenval_index = param_index # assign the param that denotes the eigenvalue
+                    vec_i.append(np.exp(2*np.pi*1j*params[param_index]))
+                    param_index += 1
+                else:
+                    vec_i.append(np.exp(2*np.pi*1j*params[param_index]))
+
+        vectors.append(np.array(vec_i, dtype=complex))
+    
+    return vectors
+
+def loss_phase(params, d, guess):
+    '''Returns the loss for the phase optimization'''
+    if guess:
+        # preset some of the params
+        guess_params = [(1/2, 0)] # first entry is the eigenvalue
+        for i in range(1, d//2):
+            guess_params.append((0, i))
+        # now have the 0 eigenphase
+        for i in range(d//2, (d-2)//2*d//2+1,d//2):
+            guess_params.append((0, i))
+        # now have the pi eigenphase
+        for i in range((d-2)//2*d//2+d//2, (d-2)//2*d//2+d//2+(d-2)//2*d//2, d//2):
+            guess_params.append((1/2, i))
+
+        # insert these into params and then generate vectors
+        params = list(params)
+        for pair in guess_params:
+            params.insert(pair[1], pair[0])
+
+        params = np.array(params)
+
+    # get vectors
+    vectors = get_vectors(params)
+
+    # get inner products
+    inner_prods = 0
+    for i in range(len(vectors)):
+        for j in range(i+1, len(vectors)):
+            inner_prods += np.abs(np.dot(vectors[i], vectors[j].conj().T))
+
+    return inner_prods
+
+def random_gen(num_params):
+    '''Generate random parameters'''
+    return np.random.uniform(-1, 1, size=(num_params))
+
+def optimize_phase(d, guess = False, tol=1e-10, x0=None):
+    '''Minimize the loss function of sum of abs value of inner products to find the optimal phases'''
+
+    # parametrize the funcs
+    loss_phase_partial = partial(loss_phase, d=d, guess=guess)
+    random_gen_partial = partial(random_gen, num_params=(d-1)*(d//2))
 
 
+    if x0 is None:
+        x_best, loss_best = trabbit(loss_func=loss_phase_partial, random_gen=random_gen_partial, alpha=1, tol=tol, temperature=0.01)
+    else:
+        x_best, loss_best = trabbit(loss_func=loss_phase_partial, random_gen=random_gen_partial, alpha=1, tol=tol, temperature=0.01, x0_ls=[x0])
 
+    print(f'best loss: {loss_best}')
+    print(f'best params: {list(x_best)}')
+    return x_best, loss_best
 
-def phase(d, neg=False):
+## symbolic ##
+import sympy as sp
+from new_esym_6 import custom_chop
+
+def get_vectors_symbolic(params):
+    '''Same as get_vectors but with sympy'''
+
+    # extract the dimension
+    d = (1+np.sqrt(1+8*len(params)))*0.5
+    d = int(d)
+
+    # initialize with the trivial case of no phase
+    vectors = [sp.Matrix(np.ones(d))]
+
+    # for each remaining vector add the phase
+    param_index = 0
+    for _ in range(1,d):
+        vec_i = [1]
+        for j in range(d-1):
+            if param_index >= len(params):
+                break
+            if j > 0 and j%2 == 0:
+                # get the phase
+                vec_i.append(sp.exp(2*sp.pi*sp.I*(params[param_index]+params[eigenval_index])))
+                param_index += 1
+            else:
+                if j==0:
+                    eigenval_index = param_index # assign the param that denotes the eigenvalue
+                    vec_i.append(sp.exp(2*sp.pi*sp.I*params[param_index]))
+                    param_index += 1
+                else:
+                    vec_i.append(sp.exp(2*sp.pi*sp.I*params[param_index]))
+                    
+        vectors.append(sp.Matrix(vec_i))
+    
+    return vectors
+
+def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
+    '''Returns the inner products of the vectors substituting the numerical params if any for even dimension d.
+
+    Params:
+        d (int): dimension of system
+        numerical_params (list): list of pairs of numerical params to substitute along with the index of the params to substitute
+        apply_guess (bool): whether to apply the phase guess or not
+        solve (bool): whether to solve for the numerical params or not
+    
+    '''
+
+    # get symbols
+    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]))
+
+    # get vectors
+    vectors = get_vectors_symbolic(params)
+    print('vectors: ', vectors)
+
+    # get inner products
+    n = len(vectors)
+    results = sp.Matrix.zeros(n, n)
+    for i in range(n):
+        for j in range(i+1, n):
+            results[i, j] = vectors[i].dot(vectors[j].conjugate().T)
+            results[j, i] = results[i, j].conjugate()
+
+    # if numerical values are not given, then just print out the expressions
+    if numerical_params is None and apply_guess == False:
+        for i in range(n):
+            print('\Vec{I}'+f'_{i}'+ ' &= \\begin{bmatrix}')
+            for j in range(n):
+                expr = results[i, j]
+                expr = sp.simplify(expr)
+                sp.print_latex(expr)
+                print('\\\\')
+            print('\\end{bmatrix},\\\\')
+
+    else:
+        if numerical_params is not None:
+            # get list of indices to substitute
+            indices = [pair[1] for pair in numerical_params]
+            vals = [pair[0] for pair in numerical_params]
+            test_params = []
+            for i in range(len(params)):
+                if i in indices:
+                    test_params.append(vals[indices.index(i)])
+                else:
+                    test_params.append(params[i])
+
+            print('test params: ', test_params)
+        elif apply_guess == True:
+            # get initial 1, -1, 1, -1, ... vector
+            guess_params = [(1/2, 0)] # first entry is the eigenvalue
+            for i in range(1, d//2):
+                guess_params.append((0, i))
+            # now have the 0 eigenphase
+            for i in range(d//2, (d-2)//2*d//2+1,d//2):
+                print(f'first, {i}')
+                guess_params.append((0, i))
+            # now have the pi eigenphase
+            for i in range((d-2)//2*d//2+d//2, (d-2)//2*d//2+d//2+(d-2)//2*d//2, d//2):
+                print(f'second, {i}')
+                guess_params.append((1/2, i))
+
+            print('total guess params: ', guess_params)
+            # get the complete test_params
+            indices = [pair[1] for pair in guess_params]
+            vals = [pair[0] for pair in guess_params]
+            test_params = []
+            for i in range(len(params)):
+                if i in indices:
+                    test_params.append(vals[indices.index(i)])
+                else:
+                    test_params.append(params[i])
+
+            print('guess params: ', test_params)
+
+        # apply to results
+        results = results.subs({params[i]: test_params[i] for i in range(len(params))})
+
+        for i in range(n):
+            print('\Vec{I}'+f'_{i}'+ ' &= \\begin{bmatrix}')
+            for j in range(n):
+                expr = results[i, j]
+                expr = sp.N(expr)
+                expr = custom_chop(expr, tol=1e-15)
+                expr = sp.simplify(expr)
+                sp.print_latex(expr)
+                print('\\\\')
+            print('\\end{bmatrix},\\\\')
+
+        if solve:
+            # solve for values that make sum of abs value of inner products = 0
+            total_sum = 0
+            for i in range(n):
+                for j in range(n):
+                    total_sum += sp.Abs(results[i, j])
+            total_sum = sp.simplify(total_sum)
+            total_sum = [total_sum]
+            print(indices)
+            # solve for the remaining params
+            remaining_params = [params[i] for i in range(len(params)) if i not in indices]
+
+            # initialize the guess
+            guess = [0 for _ in range(len(remaining_params))]
+
+            # Solve the equation (if it's solvable)
+            solution = sp.nsolve(total_sum,remaining_params, guess)
+            print(f'solution: {solution}')
+ 
+def phase_guess(d, neg=False):
     # # get n
     # n = d - 2
     # m = n-1
@@ -241,7 +363,26 @@ def phase(d, neg=False):
 
     return np.array(phase_ls)
 
-d = 18
-# print(phase(d, neg=False)@np.ones(d).T)
-correlation_classes(d)
+if __name__ == '__main__':
+#    print(sum([
+#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
+#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
+#    ]))
+
+#    print(sum([
+#         -np.cos(np.pi/3)+1j * np.sin(np.pi/3),
+#         -np.cos(np.pi/3)+1j * np.sin(np.pi/3),
+#         -np.cos(np.pi/3)-1j * np.sin(np.pi/3),
+#         -np.cos(np.pi/3)-1j * np.sin(np.pi/3),
+#    ]))
+    # print(get_vectors([0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]))
+    # numerical_params = [(1/3, 1), (-1/3, 2), (1/2, 3), (-1, 4), (0, 5), (2/3, 7), (1/3, 8), (4/3, 10), (-1/3, 11), (2/3, 13), (1/3, 14)]
+    # get_inner_prods(10, apply_guess=True)
+    optimize_phase(10, tol=1e-10)
 
