@@ -173,6 +173,27 @@ def optimize_remaining(tol=1e-10):
 ## sympy code ##
 import sympy as sp
 
+def custom_chop(expr, tol=1e-15):
+    '''Removes small values (below tol) in sympy expressions in order to simplify numerical + symbolic expressions'''
+    if expr is None:
+        print("Encountered None expression")
+        return None
+    elif expr.is_Number:
+        if abs(expr) < tol:
+            return sp.Integer(0)
+        else:
+            return expr
+    elif expr.is_Symbol:
+        return expr
+    else:
+        if not expr.args:  # If expr.args is empty
+            return expr
+        chopped_args = [custom_chop(arg, tol) for arg in expr.args]
+        if None in chopped_args:
+            print("None found in arguments of:", expr)
+            return None
+        return expr.func(*chopped_args)
+
 def get_inner_prods(numerical_params=None, solve=False):
     '''Compute symbolic inner products between vectors, either completely symbolically or with numerical values for some of the parameters.
 
@@ -203,27 +224,6 @@ def get_inner_prods(numerical_params=None, solve=False):
         for j in range(i+1, n):
             results[i, j] = vectors[i].dot(vectors[j].conjugate().T)
             results[j, i] = results[i, j].conjugate()
-
-    def custom_chop(expr, tol=1e-15):
-        '''Removes small values (below tol) in sympy expressions in order to simplify numerical + symbolic expressions'''
-        if expr is None:
-            print("Encountered None expression")
-            return None
-        elif expr.is_Number:
-            if abs(expr) < tol:
-                return sp.Integer(0)
-            else:
-                return expr
-        elif expr.is_Symbol:
-            return expr
-        else:
-            if not expr.args:  # If expr.args is empty
-                return expr
-            chopped_args = [custom_chop(arg, tol) for arg in expr.args]
-            if None in chopped_args:
-                print("None found in arguments of:", expr)
-                return None
-            return expr.func(*chopped_args)
 
     # if numerical values are not given, then just print out the expressions
     if numerical_params is None:
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     # best_params_numerical = [0.3073524627378583, 0.3333333179399618, -0.33333334259706254, 0.4999999920193058, -1.0000000130072773, -1.2082227449358706e-08, -0.02563931056721057, 0.6666666524787896, 0.33333331987509573, 0.8073524630069947, 1.3333333168849828, -0.33333334966782724, -0.5256393104295811, 0.666666651145216, 0.3333333221305492]
     best_params_approx = [0.3073524627378583, 1/3, -1/3, 1/2, -1, 0, -0.02563931056721057, 2/3, 1/3, 0.8073524630069947, 4/3, -1/3, -0.5256393104295811, 2/3, 1/3]
 
-    get_inner_prods(best_params_approx, solve=True)
+    get_inner_prods(best_params_approx)
 
     # actual best params determined with get_inner_prods() 
     # best_params = [0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]
