@@ -467,9 +467,9 @@ if __name__ == '__main__':
 
     # get_inner_prods(10, numerical_params=params_ana2, apply_guess=False, solve=True)
     # (1/2, 6), (0, 2), (1/2, 7), (0, 3), (1/2, 8), (0, 4), (0, 9), (0, 31), (1/2, 41), (0, 32), (1/2, 42), (0, 33), (0, 43), (0, 34), (1/2, 44)
-    params_ana3 = params_ana2 + [(0,1)]
-    # simplify_system(10, params_ana3)
+    params_ana3 = params_ana2 + [(0,1), (0,2)]
+    simplify_system(10, params_ana3)
 
 
-    row_reduce(6)
+    # row_reduce(6)
 

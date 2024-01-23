@@ -1,5 +1,9 @@
 Hi, these are some notes by Oscar on his code for thesis. I will be adding more clarifications as I go on in the spring to make this code as useful to future generations as possible. :)
 
+## 1/23/24
+- wrote matlab files for computing rref and det of the vector of phase vectors
+- but was able to use definition of the phase vectors directly to prove orthogonality!!! so that's the proof for even d!!!!!!
+
 ## 1/22/24
 - started the file new_esym_general.py to generalize new_esym_6.py.
 - successfully coded the correlation class code for any even dimension!!
