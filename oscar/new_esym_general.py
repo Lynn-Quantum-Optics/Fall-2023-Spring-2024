@@ -129,7 +129,7 @@ def get_vectors(params):
     
     return vectors
 
-def loss_phase(params, d, guess):
+def loss_phase(params, d, guess, replacement_params=None):
     '''Returns the loss for the phase optimization'''
     if guess:
         # preset some of the params
@@ -149,6 +149,16 @@ def loss_phase(params, d, guess):
             params.insert(pair[1], pair[0])
 
         params = np.array(params)
+
+    if replacement_params is not None:
+        new_numerical_params = []
+        for i in range(len(params)):
+            elem = params[i]
+            if type(elem)==float: 
+                new_numerical_params.append(elem)
+            else:
+                new_numerical_params.append(replacement_params[i])
+        params = new_numerical_params
 
     # get vectors
     vectors = get_vectors(params)
@@ -231,7 +241,7 @@ def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
     '''
 
     # get symbols
-    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]))
+    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]), real=True)
 
     # get vectors
     vectors = get_vectors_symbolic(params)
@@ -258,6 +268,15 @@ def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
 
     else:
         if numerical_params is not None:
+            # only keep the elements with a pair in numerical_params
+            new_numerical_params = []
+            for i in range(len(numerical_params)):
+                elem = numerical_params[i]
+                if type(elem)!=float: 
+                    new_numerical_params.append(elem)
+
+            numerical_params = new_numerical_params
+            
             # get list of indices to substitute
             indices = [pair[1] for pair in numerical_params]
             vals = [pair[0] for pair in numerical_params]
@@ -363,26 +382,94 @@ def phase_guess(d, neg=False):
 
     return np.array(phase_ls)
 
-if __name__ == '__main__':
-#    print(sum([
-#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) + 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
-#         -np.cos(np.pi/5) - 1j* np.sin(np.pi/5),
-#    ]))
+def simplify_system(d, numerical_params):
+    '''Takes in a list of params, creates vectors, and returns the system of equations given those values'''
 
-#    print(sum([
-#         -np.cos(np.pi/3)+1j * np.sin(np.pi/3),
-#         -np.cos(np.pi/3)+1j * np.sin(np.pi/3),
-#         -np.cos(np.pi/3)-1j * np.sin(np.pi/3),
-#         -np.cos(np.pi/3)-1j * np.sin(np.pi/3),
-#    ]))
-    # print(get_vectors([0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]))
-    # numerical_params = [(1/3, 1), (-1/3, 2), (1/2, 3), (-1, 4), (0, 5), (2/3, 7), (1/3, 8), (4/3, 10), (-1/3, 11), (2/3, 13), (1/3, 14)]
-    # get_inner_prods(10, apply_guess=True)
-    optimize_phase(10, tol=1e-10)
+    # get symbols
+    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]), real=True)
+
+    # get vectors
+    vectors = get_vectors_symbolic(params)
+
+    # only keep the elements with a pair in numerical_params
+    new_numerical_params = []
+    for i in range(len(numerical_params)):
+        elem = numerical_params[i]
+        if type(elem)!=float: 
+            new_numerical_params.append(elem)
+
+    numerical_params = new_numerical_params
+    
+    # get list of indices to substitute
+    indices = [pair[1] for pair in numerical_params]
+    vals = [pair[0] for pair in numerical_params]
+    test_params = []
+    for i in range(len(params)):
+        if i in indices:
+            test_params.append(vals[indices.index(i)])
+        else:
+            test_params.append(params[i])
+
+    # substitute into vectors
+    vectors = [vec.subs({params[i]: test_params[i] for i in range(len(params))}) for vec in vectors]
+
+    # now list out all unique inner products
+    n = len(vectors)
+    for i in range(n):
+        for j in range(i+1, n):
+            expr = vectors[i].dot(vectors[j].conjugate().T)
+            expr = sp.N(expr)
+            expr = custom_chop(expr, tol=1e-15)
+            expr = sp.simplify(expr)
+            if expr != 0:
+                # print(f'inner product {i}, {j}: ')
+                sp.print_latex(expr)
+                print('\\\\')  
+
+def row_reduce(d):
+    '''Computes the row reduced form of the matrix of vectors to test linear independence'''
+    # get the params
+    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]), real=True)
+
+    # get vectors
+    vectors = get_vectors_symbolic(params)
+
+    # create a matrix where the column vectors are the vectors
+    # Initialize an empty matrix with the same number of rows as the matrices in your list
+    result_matrix = sp.Matrix(vectors[0].shape[0], 0, [])
+
+    # Concatenate each matrix in the list as a new column
+    for mat in vectors:
+        result_matrix = result_matrix.row_join(mat)
+
+    rref_matrix, pivot_columns = result_matrix.rref()
+
+    # rref_matrix is the row-reduced echelon form of your matrix
+    print("Row-reduced echelon form:")
+    print(rref_matrix)
+
+    # pivot_columns are the indices of the pivot columns
+    print("Pivot columns:", pivot_columns)
+
+    
+if __name__ == '__main__':
+    # loss_num1= 3.518236836123831e-05
+    # params_num1= [-0.5000003021751246, 0.8297261207122422, 0.4002740820670201, -0.24187654563870226, -0.036890852462187464, 0.49999969026391267, 0.6297261226700273, -0.39972592038372085, -0.8418765441599031, 0.5631091443171757, -0.5000002990545374, 0.2297261175948017, 0.00027407425516466307, -1.0418765582144849, 0.7631091378953769, -3.1341316201935654e-07, -0.6000001279508675, 0.19999974006658813, 0.7999997549735715, -0.4000001712524025, -0.5000003039751297, -0.9702738700872592, 1.2002740911151337, -0.641876543160646, 0.3631091477758074, -3.2204363112297466e-07, 0.5999998095181849, -0.20000030392990611, 1.1999997075787876, -0.600000233255531, -3.0635065754545956e-07, -0.20000021245432606, -0.6000003197638013, 1.5999996970758865, -0.8000002532317712, -0.5000003180771708, 0.4297261220252235, 0.8002740773310877, -1.441876550125145, -0.8368908584033007, -3.1535010174187685e-07, -0.8000001903296595, 0.5999997282862437, 0.3999997403344088, -0.2000002332089973]
+    # params_ana1 = [-1/2, 0.8297261207122422,0.4, -0.24187654563870226, -0.036890852462187464, 1/2, 0.6297261226700273, -0.4, -0.8418765441599031, 0.5631091443171757, -1/2, 0.2297261175948017, 0.00027407425516466307, -1.0418765582144849, 0.7631091378953769, 0, -0.6, 0.2, 0.8, -0.4, -1/2, -0.9702738700872592, 1.2, -0.641876543160646, 0.3631091477758074, 0, 0.6, -0.2, 1.2, -0.6, 0, -0.2, -0.6, 1.6, -0.8, -0.5, 0.4297261220252235, 0.8, -1.441876550125145, -0.8368908584033007, 0, -0.8, 0.6, 0.4, -0.2]
+    loss_num2 = 1.121236366580341e-05
+    params_num2 = [0.49999997271298846, -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, -0.5000000367240022, -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, -0.5000000378797359, -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, 0.9999999616216863, -1.400000096962391, 0.3999998998223931, -0.20000010275611058, -0.8000001073516739, 0.9999999596356349, -0.2000000936732211, 0.19999990198821, -0.6000000953637014, 0.599999899801483, -4.174821191195496e-08, -0.8000000996216404, 0.7999998935621904, -0.40000009449924656, -0.6000000966388638, -0.5000000421796911, 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, -4.0704953106727827e-08, -0.600000083086426, 0.5999999152591754, -0.8000000963266489, 0.7999999018863323, -0.500000034486441, -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
+
+    # has loss 1.121236366580341e-05
+    params_ana2 = [(1/2,0), -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, (-1/2, 5), -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, (-1/2, 10), -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, (1, 15), (-1.4, 16), (0.4, 17), (-0.2, 18), (-0.8, 19), (1, 20), (-0.2, 21), (0.2, 22), (-0.6, 23), (0.6, 24), (0, 25), (-0.8, 26), (0.8, 27), (-0.4, 28), (-0.6, 29), (-1/2, 30), 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, (0, 35), (-0.6, 36), (0.6, 37), (-0.8, 38), (0.8, 39), (-1/2, 40), -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
+
+    # print(loss_phase(params_num2, 10, guess=False, replacement_params=params_ana2))
+
+
+    # get_inner_prods(10, numerical_params=params_ana2, apply_guess=False, solve=True)
+    # (1/2, 6), (0, 2), (1/2, 7), (0, 3), (1/2, 8), (0, 4), (0, 9), (0, 31), (1/2, 41), (0, 32), (1/2, 42), (0, 33), (0, 43), (0, 34), (1/2, 44)
+    params_ana3 = params_ana2 + [(0,1)]
+    # simplify_system(10, params_ana3)
+
+
+    row_reduce(6)
 
