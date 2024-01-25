@@ -2,7 +2,7 @@
 import numpy as np
 from functools import partial
 
-def correlation_classes(d):
+def get_correlation_classes(d, print_result=False):
     '''Returns the correlation classes for a given d. Assumes d is even.'''
 
     assert d % 2 == 0, f'd must be even. Your d is {d}'
@@ -91,6 +91,10 @@ def correlation_classes(d):
         # print(f'correlation class {i}: {correlation_classes[i]}')
         assert len(correlation_classes[i]) == d, f'Correlation classes are not of length d. Your correlation class {i} is {correlation_classes[i]}'
 
+    if print_result:
+        for i in range(d):
+            print(f'correlation class {i}: {correlation_classes[i]}')
+
     return correlation_classes
     
 from new_esym_6 import check_orthogonal, check_constraints_and_orthogonality
@@ -102,6 +106,8 @@ def get_vectors(params):
     # extract the dimension
     d = (1+np.sqrt(1+8*len(params)))*0.5
     d = int(d)
+
+    print(f'params: {params}')
 
     # initialize with the trivial case of no phase
     vectors = [np.ones(d, dtype=complex)]
@@ -129,7 +135,7 @@ def get_vectors(params):
     
     return vectors
 
-def loss_phase(params, d, guess, replacement_params=None):
+def loss_phase(params, guess=False, replacement_params=None):
     '''Returns the loss for the phase optimization'''
     if guess:
         # preset some of the params
@@ -171,6 +177,18 @@ def loss_phase(params, d, guess, replacement_params=None):
 
     return inner_prods
 
+def sum_abs_inner_prods(params):
+    '''Assumes list of tuples of (phase, index)'''
+    # get ordered params to sent to loss_phase
+    ordered_params = [0 for _ in range((d-1)*(d//2))]
+    for pair in params:
+        ordered_params[pair[1]] = pair[0]
+
+    # get vectors
+    return loss_phase(ordered_params)
+
+
+
 def random_gen(num_params):
     '''Generate random parameters'''
     return np.random.uniform(-1, 1, size=(num_params))
@@ -192,6 +210,72 @@ def optimize_phase(d, guess = False, tol=1e-10, x0=None):
     print(f'best params: {list(x_best)}')
     return x_best, loss_best
 
+def get_det(params):
+    # get vectors
+    vectors = get_vectors(params)
+    # create a matrix where the column vectors are the vectors
+    result_matrix = np.zeros((vectors[0].shape[0], 0), dtype=complex)
+
+    # Concatenate each matrix in the list as a new column
+    for mat in vectors:
+        result_matrix = np.hstack((result_matrix, mat.reshape(-1, 1)))
+
+    # print each row separately
+    for row in result_matrix:
+        # add & signs between each entry
+        for i in range(len(row)):
+            if i == len(row)-1:
+                print(np.round(row[i],3), end='\\\\')
+            else:
+                print(np.round(row[i],3), end=' & ')
+    print('----')
+
+    # take the inner product of all the columns
+    for i in range(result_matrix.shape[1]):
+        for j in range(i+1, result_matrix.shape[1]):
+            print(np.round(np.abs(np.dot(result_matrix[:, i], result_matrix[:, j].conj())),3), end=' & ')
+        print('\\\\')
+
+    # get determinant
+    det_result  = np.linalg.det(result_matrix)
+    print('determinant: ', det_result)
+
+    # take V^dagger V
+    VdaggerV = result_matrix.conj().T @ result_matrix
+    print('----')
+    # print each row separately
+    for row in VdaggerV:
+        # add & signs between each entry
+        for i in range(len(row)):
+            if i == len(row)-1:
+                print(np.round(row[i],3), end='\\\\')
+            else:
+                print(np.round(row[i],3), end=' & ')
+    # get determinant
+    det_result  = np.linalg.det(VdaggerV)
+    print(f'determinant VdaggerV:  {det_result}')
+
+    
+    # return det_result
+
+def get_inner_prod_sub(d, params, num_vecs = None):
+    '''Computes inner product of subset of total vectors for a given set of params'''
+
+    if num_vecs is None:
+        num_vecs = d
+
+    # get vectors
+    vectors = get_vectors(params)
+
+    # get inner products
+    inner_prods = 0
+    for i in range(num_vecs):
+        for j in range(i+1, num_vecs):
+            inner_prods += np.abs(np.dot(vectors[i], vectors[j].conj().T))
+
+    print(f'inner prods for {num_vecs} vectors: {inner_prods}')
+    return inner_prods
+
 ## symbolic ##
 import sympy as sp
 from new_esym_6 import custom_chop
@@ -200,8 +284,15 @@ def get_vectors_symbolic(params):
     '''Same as get_vectors but with sympy'''
 
     # extract the dimension
-    d = (1+np.sqrt(1+8*len(params)))*0.5
-    d = int(d)
+    try:
+        d = (1+np.sqrt(1+8*len(params)))*0.5
+        d = int(d)
+    except TypeError:
+        vectors = [sp.Matrix(np.ones(2))]
+        vec_i = [1, sp.exp(2*sp.pi*sp.I*params)]
+        vectors.append(sp.Matrix(vec_i))
+        return vectors
+    
 
     # initialize with the trivial case of no phase
     vectors = [sp.Matrix(np.ones(d))]
@@ -226,6 +317,8 @@ def get_vectors_symbolic(params):
                     vec_i.append(sp.exp(2*sp.pi*sp.I*params[param_index]))
                     
         vectors.append(sp.Matrix(vec_i))
+
+    print('vectors: ', vectors)
     
     return vectors
 
@@ -263,6 +356,7 @@ def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
                 expr = results[i, j]
                 expr = sp.simplify(expr)
                 sp.print_latex(expr)
+                # print([i+1+j*d//2 for i in range(d//2)])
                 print('\\\\')
             print('\\end{bmatrix},\\\\')
 
@@ -316,6 +410,7 @@ def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
             print('guess params: ', test_params)
 
         # apply to results
+        results_old = results
         results = results.subs({params[i]: test_params[i] for i in range(len(params))})
 
         for i in range(n):
@@ -326,6 +421,11 @@ def get_inner_prods(d, numerical_params=None, apply_guess=True, solve=False):
                 expr = custom_chop(expr, tol=1e-15)
                 expr = sp.simplify(expr)
                 sp.print_latex(expr)
+                if expr != 0:
+                    print('expr old')
+                    print(results_old[i, j])
+                    # print([i+k*d//2 for k in range(d-2)])
+                    # print([j+k*d//2 for k in range(d-2)])
                 print('\\\\')
             print('\\end{bmatrix},\\\\')
 
@@ -442,34 +542,362 @@ def row_reduce(d):
     for mat in vectors:
         result_matrix = result_matrix.row_join(mat)
 
-    rref_matrix, pivot_columns = result_matrix.rref()
+    sp.print_latex(result_matrix)
 
-    # rref_matrix is the row-reduced echelon form of your matrix
-    print("Row-reduced echelon form:")
-    print(rref_matrix)
+    # get determinant
+    det_result  = result_matrix.det()
+    print('determinant: ', sp.print_latex(det_result))
+    # get random params
+    random_params = np.random.uniform(-1, 1, size=(d-1)*(d//2))
+    det_result = det_result.subs({params[i]: random_params[i] for i in range(len(params))})
+    # evaluate
+    det_result = sp.N(det_result)
+    print('determinant numerical: ', sp.print_latex(det_result))
+    # print('determinant simplified: ', sp.print_latex(sp.simplify(det_result)))
+    
+def compute_vandermond_det(d, params):
+    '''Computes determinant of wronskian of p_vec'''
+    # get all, p_j, p_{j+1}, p_{j}+p_{j+2}, p_{j+1}+p_{j+3}, ... p_{j}+p_{j+d/2}
+    alpha = params[0]
+    vander_param = [alpha]
+    param_index = 1
+    for _ in range(1,d):
+        for j in range(d-1):
+            if param_index >= len(params):
+                break
+            if j > 0 and j%2 == 0:
+                # get the phase
+                vander_param.append(alpha + params[param_index]+params[eigenval_index])
+                param_index += 1
+            else:
+                if j==0:
+                    eigenval_index = param_index # assign the param that denotes the eigenvalue
+                    vander_param.append(alpha + params[param_index])
+                    param_index += 1
+                else:
+                    vander_param.append(alpha + params[param_index])
+                    
+    # compute product of c_j - c_i fpr i < j
+    print(params)
+    prod = 1
+    for i in range(len(vander_param)):
+        for j in range(i):
+            prod *= (vander_param[j] - vander_param[i])
 
-    # pivot_columns are the indices of the pivot columns
-    print("Pivot columns:", pivot_columns)
+    print('vandermonde determinant: ', prod)
+    return prod
+            
+def show_orthogonality(d):
+    '''Compute V^T V'''
+    # get the params
+    params = sp.symbols(' '.join([f'p{i}' for i in range((d-1)*(d//2))]), real=True)
+
+    # get vectors
+    vectors = get_vectors_symbolic(params)
+
+    # create a matrix where the column vectors are the vectors
+    # Initialize an empty matrix with the same number of rows as the matrices in your list
+    result_matrix = sp.Matrix(vectors[0].shape[0], 0, [])
+
+    # Concatenate each matrix in the list as a new column
+    for mat in vectors:
+        result_matrix = result_matrix.row_join(mat)
+
+    # take V^dagger V
+    result_matrix = result_matrix.H* result_matrix
+    sp.print_latex(result_matrix)
+
+# def create_orthogonal_vectors(d):
+#     # Number of columns = (d - 2) / 2
+#     num_cols = (d - 2) // 2
+
+#     # Number of rows = (d - 2) / 2
+#     num_rows = (d - 2) // 2
+
+#     # Create a modified DFT matrix
+#     n = np.arange(1, d//2+1)
+#     k = np.arange(1, num_rows+1).reshape((num_rows, 1))
+#     omega =  k * n[:num_cols] / d
+
+#     return omega
+    
+def create_orthogonal_vectors(d):
+    # Create a modified DFT matrix
+    n = np.arange(d//2)
+    k = n.reshape((d//2, 1))
+    omega = k * n / (d//2)
+
+    # remove first row and column
+    omega = omega[1:, 1:]
+    return omega
+
+def create_tuples_from_vectors(vectors, d):
+    print(vectors)
+    # Reshape into matrix M
+    M = vectors.reshape(((d - 2) // 2, (d - 2) // 2))
+
+    # Create a list of tuples
+    tuples = []
+    # Increment value for indices
+    increment = d // 2
+
+    for i in range(M.shape[0]):
+        # Handle the first element of each row
+        tuples.append((M[i][0], i + 1))
+        tuples.append((M[i][0], i + 1 + 3 * increment))
+        # Special case for the middle index
+        tuples.append((0, i + 1 + increment))
+        # next pair
+        tuples.append((M[i][1], i + 1 + 2 * increment))
+        tuples.append((M[i][1], i + 1 + 4 * increment))
+
+        if M.shape[1] > 2:
+            # Handle subsequent elements of each row
+            for j in range(2,M.shape[1]):
+                int_j = j + 2
+                index1 = i + 1 + increment + int_j * increment
+                index2 = index1 + 2*increment
+                # check if index2 is out of bounds
+                if index2 > d**2//2 - d//2:
+                    index2 -=  increment
+
+                tuples.append((M[i][j], index1))
+                tuples.append((M[i][j], index2))
+
+    return tuples
+
+if __name__ == '__main__':
+    # get_correlation_classes(6, print_result=True)
+
+    # create param
+    d = 8
+   
+    # append create tuples from vectors
+    vectors = create_orthogonal_vectors(d)
+    tuples = create_tuples_from_vectors(vectors, d)
+
+    # append to numerical params
+    numerical_params = tuples
+
+     # first add the eigenphases
+    for i in range(d-1):
+        if i == d-2:
+            numerical_params.append((1/2, i*d//2))
+        elif i %2 == 0:
+            numerical_params.append((0, i*d//2))
+        elif i %2 != 0:
+            numerical_params.append((1/2, i*d//2))
+        else:
+            numerical_params.append((1/2, i*d//2))
+ 
+
+
+    # compute inner products
+    get_inner_prods(d, numerical_params=numerical_params)
+    # sum([np.exp(np.pi)])
+    
+    print(numerical_params)
+    print(sum_abs_inner_prods(numerical_params))
+
+    # print(sum([np.exp(2*np.pi*1j/3), 1, np.exp(2*np.pi*1j/3), np.exp(4*np.pi*1j/3), np.exp(4*np.pi*1j/3)]))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # for i in range(M.shape[0]):
+    #     # Handle the first element of each row
+    #     tuples.append((M[i][0], i + 1))
+    #     tuples.append((M[i][0], i + 1 + 3 * increment))
+    #     # Special case for the middle index
+    #     tuples.append((0, i + 1 + increment))
+    #     # next pair
+    #     tuples.append((M[i][1], i + 1 + 2 * increment))
+    #     tuples.append((M[i][1], i + 1 + 4 * increment))
+
+    #     if M.shape[1] > 2:
+    #         # Handle subsequent elements of each row
+    #         for j in range(2,M.shape[1]):
+    #             int_j = j + 2
+    #             index1 = i + 1 + increment + int_j * increment
+    #             index2 = index1 + 2*increment
+    #             # check if index2 is out of bounds
+    #             if index2 > d**2//2 - d//2:
+    #                 index2 -=  increment
+
+    #             tuples.append((M[i][j], index1))
+    #             tuples.append((M[i][j], index2))
+
+
+
+
+
+
+
+
+
+    # now add the phase
+    # row a given row, 0 to 2 pi in d/2 steps
+    # for i in range(1, d//2):
+    #     print(f'row {i}')
+    #     print(numerical_params)
+    #     numerical_params_i = []
+    #     # numerical_params_i = [((j+i)/(d/2), i+d//2*j) for j in range(d-1)]
+    #     for j in range(0, d//2-1)
+    #     base_phase_ls = [(k*(j+i))/(d//2) for k in range(1,d//2)]
+    #     # add manually the first two
+    #     numerical_params_i.append((base_phase_ls[0], i))
+    #     numerical_params_i.append((0, i+d//2))
+    #     numerical_params_i.append((base_phase_ls[0], i+d//2*(3)))
+    #     # repeat each phase twice
+    #     for j in range(1, len(base_phase_ls)):
+    #         index = i+d//2*(j+1)
+    #         numerical_params_i.append((base_phase_ls[j], i+d//2*(j+1)))
+    #         numerical_params_i.append((base_phase_ls[j], index+2*d//2))
+                
+    #     numerical_params += numerical_params_i
+
+    # for i in range
+
+    # cehck that the phases are orthogonal
+    # get_inner_prods(d, numerical_params=numerical_params)
+    # print(numerical_params)
+
+    # i = 2
+    # d = 10
+    # # print([k*i/(d//2) for k in range(1,d//2+1)])
+    # print('----------')
+    # # for j in range(0, d//2-1):
+    # #     print([(k*(j+i))/(d//2) for k in range(1,d//2)])
+    # #     print([np.exp(2*np.pi*1j*(k*(i+j))/(d//2)) for k in range(1,d//2)])
+    # #     print('\n')
+    # print([np.exp(2*np.pi*1j*k)/(d//2)) for k in range(1,d//2)])
+
+    # def create_orthogonal_vectors(d):
+    #     '''Creates orthogonal vectors for a given dimension d'''
+    #     n = np.arange(d/2)
+    #     k = n.reshape((d//2, 1))
+    #     omega = np.exp(-2j * np.pi * k * n / (d/2))
+
+    #     return omega
+
+    # d = 10  # Example size
+    # vectors = create_orthogonal_vectors(d)
+    # print(vectors)
+
+
+
+    # numerical_params+=[(1/3, 1), (2/3, 7), (1/3, 4), (2/3, 10), (0, 13), (1/3, 2), (1/3, 5), (2/3, 8), (2/3, 11), (0, 14)]
+
+    # print(numerical_params)
+
+    # best = [0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]
+    # best_params = [(best[i], i) for i in range(len(best))]
+
+    # p = 5
+    # print(sum([np.exp(2*np.pi*1j*p_v*(j)/(d//2)) for j in range(1,d//2)]))
+    # for p_v in range(1, d//2):
+    #     print([np.exp(2*np.pi*1j*p_v*(j)/(d//2)) for j in range(1,d//2)])
+
+
+
+    # find inner products
+    # get_inner_prods(d, numerical_params=best_params)
+    # print(sum([np.exp(2*np.pi*1j*(j+1)/(d/2)) for j in range(d-1)]))
+
+    # print(sum([np.exp(2*np.pi*1j/3), np.exp(2*np.pi*1j/3), np.exp(4*np.pi*1j/3), np.exp(4*np.pi*1j/3), 1]))
+
+    # for j in range(d-1):
+    #     for l in range(d-1):
+    #         numerical_params.append((base_ls[l], j+(d//2)*l))
+    # print(numerical_params)
+    # print(len(numerical_params))
+
+
+    # simplify_system(d, numerical_params=numerical_params)
+
+
+
+
 
     
-if __name__ == '__main__':
-    # loss_num1= 3.518236836123831e-05
-    # params_num1= [-0.5000003021751246, 0.8297261207122422, 0.4002740820670201, -0.24187654563870226, -0.036890852462187464, 0.49999969026391267, 0.6297261226700273, -0.39972592038372085, -0.8418765441599031, 0.5631091443171757, -0.5000002990545374, 0.2297261175948017, 0.00027407425516466307, -1.0418765582144849, 0.7631091378953769, -3.1341316201935654e-07, -0.6000001279508675, 0.19999974006658813, 0.7999997549735715, -0.4000001712524025, -0.5000003039751297, -0.9702738700872592, 1.2002740911151337, -0.641876543160646, 0.3631091477758074, -3.2204363112297466e-07, 0.5999998095181849, -0.20000030392990611, 1.1999997075787876, -0.600000233255531, -3.0635065754545956e-07, -0.20000021245432606, -0.6000003197638013, 1.5999996970758865, -0.8000002532317712, -0.5000003180771708, 0.4297261220252235, 0.8002740773310877, -1.441876550125145, -0.8368908584033007, -3.1535010174187685e-07, -0.8000001903296595, 0.5999997282862437, 0.3999997403344088, -0.2000002332089973]
-    # params_ana1 = [-1/2, 0.8297261207122422,0.4, -0.24187654563870226, -0.036890852462187464, 1/2, 0.6297261226700273, -0.4, -0.8418765441599031, 0.5631091443171757, -1/2, 0.2297261175948017, 0.00027407425516466307, -1.0418765582144849, 0.7631091378953769, 0, -0.6, 0.2, 0.8, -0.4, -1/2, -0.9702738700872592, 1.2, -0.641876543160646, 0.3631091477758074, 0, 0.6, -0.2, 1.2, -0.6, 0, -0.2, -0.6, 1.6, -0.8, -0.5, 0.4297261220252235, 0.8, -1.441876550125145, -0.8368908584033007, 0, -0.8, 0.6, 0.4, -0.2]
-    loss_num2 = 1.121236366580341e-05
-    params_num2 = [0.49999997271298846, -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, -0.5000000367240022, -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, -0.5000000378797359, -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, 0.9999999616216863, -1.400000096962391, 0.3999998998223931, -0.20000010275611058, -0.8000001073516739, 0.9999999596356349, -0.2000000936732211, 0.19999990198821, -0.6000000953637014, 0.599999899801483, -4.174821191195496e-08, -0.8000000996216404, 0.7999998935621904, -0.40000009449924656, -0.6000000966388638, -0.5000000421796911, 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, -4.0704953106727827e-08, -0.600000083086426, 0.5999999152591754, -0.8000000963266489, 0.7999999018863323, -0.500000034486441, -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
+    # imagine creating params as matrix where each row represents p_j, p_{j + d/2}, p_{j + d}, ...
+    # each column will have the same
 
-    # has loss 1.121236366580341e-05
-    params_ana2 = [(1/2,0), -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, (-1/2, 5), -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, (-1/2, 10), -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, (1, 15), (-1.4, 16), (0.4, 17), (-0.2, 18), (-0.8, 19), (1, 20), (-0.2, 21), (0.2, 22), (-0.6, 23), (0.6, 24), (0, 25), (-0.8, 26), (0.8, 27), (-0.4, 28), (-0.6, 29), (-1/2, 30), 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, (0, 35), (-0.6, 36), (0.6, 37), (-0.8, 38), (0.8, 39), (-1/2, 40), -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
-
-    # print(loss_phase(params_num2, 10, guess=False, replacement_params=params_ana2))
+        
 
 
-    # get_inner_prods(10, numerical_params=params_ana2, apply_guess=False, solve=True)
-    # (1/2, 6), (0, 2), (1/2, 7), (0, 3), (1/2, 8), (0, 4), (0, 9), (0, 31), (1/2, 41), (0, 32), (1/2, 42), (0, 33), (0, 43), (0, 34), (1/2, 44)
-    params_ana3 = params_ana2 + [(0,1), (0,2)]
-    simplify_system(10, params_ana3)
+    # show_orthogonality(d)
+    # get_det([0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3])
+
+    # print(sum([np.exp(2*np.pi*1j/3), 1, np.exp(4*np.pi*1j/3), np.exp(8*np.pi*1j/3), np.exp(4*np.pi*1j/3)]))
+    # print(sum([np.exp(2*np.pi/1j*i/4) for i in range(5)]))
 
 
-    # row_reduce(6)
+
+    # get evenly spaced phase params from 0 to 2pi in d^2/2 - d/2 steps
+    # base = np.linspace(0, 2*np.pi, num=(d//2))
+    # # get d-2 random permutations of the base
+    # params = list(np.random.permutation(base))
+    # what if set diagonal to be 0 to 2pi in d-1 steps, rest 0?
+    # base = np.linspace((d-1)/(2*np.pi), 2*np.pi, num=(d-1+2))
+    # # create all 0 vector for params
+    # params = [0 for _ in range(d**2//2-d//2)]
+    # print(len(params))
+    # # set diagonal to be base
+    # for i in range(d-1):
+    #     print((i+1)*d//2)
+    #     params[(i+1)*d//2] = base[i]
+    # indices = [0, 4, 6, 7, 11, 12, 14] # for d = 6
+    # # indices = [0, 3, 4, 5]
+    # for i in indices:
+    #     params[i] = base[indices.index(i)]
+
+    # # print(params)
+    # # get_inner_prod_sub(d, params, num_vecs=2)
+    # get_det(params)
+
+
+    # for _ in range(d-2):
+    #     params += list(np.random.permutation(base))
+    # print(params)
+    # get_inner_prod_sub(d, params)
+
+    # best_params =[0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]
+    # get_det(best_params)
+    # get_inner_prod_sub(d, best_params)
+
+
+
+
+
+    # print(get_det(params))
+    # print(params)
+    # print(get_vectors(params))
+    # print(loss_phase(params, d, guess=False))
+    # params = [0, 1/3, -1/3, 1/2, -1, 0, 0, 2/3, 1/3, 1/2, 4/3, -1/3, 1/2, 2/3, 1/3]
+    # get_det(params)
+
+
+    ## old d = 10 numerical results
+    #loss_num2 = 1.121236366580341e-05
+    # params_num2 = [0.49999997271298846, -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, -0.5000000367240022, -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, -0.5000000378797359, -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, 0.9999999616216863, -1.400000096962391, 0.3999998998223931, -0.20000010275611058, -0.8000001073516739, 0.9999999596356349, -0.2000000936732211, 0.19999990198821, -0.6000000953637014, 0.599999899801483, -4.174821191195496e-08, -0.8000000996216404, 0.7999998935621904, -0.40000009449924656, -0.6000000966388638, -0.5000000421796911, 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, -4.0704953106727827e-08, -0.600000083086426, 0.5999999152591754, -0.8000000963266489, 0.7999999018863323, -0.500000034486441, -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
+
+    # # has loss 1.121236366580341e-05
+    # params_ana2 = [(1/2,0), -0.8356697046226463, -0.6901289076337005, -0.9331429494907373, -0.16206457394431045, (-1/2, 5), -0.43566973741722875, -0.890128957757636, 0.26685699711166727, -1.5620646086412582, (-1/2, 10), -2.235669731293962, -0.49012895748565904, -1.1331430010278547, 0.23793539481588633, (1, 15), (-1.4, 16), (0.4, 17), (-0.2, 18), (-0.8, 19), (1, 20), (-0.2, 21), (0.2, 22), (-0.6, 23), (0.6, 24), (0, 25), (-0.8, 26), (0.8, 27), (-0.4, 28), (-0.6, 29), (-1/2, 30), 1.3643302836362694, -1.2901289187555183, -0.3331429622012385, 0.6379354079374747, (0, 35), (-0.6, 36), (0.6, 37), (-0.8, 38), (0.8, 39), (-1/2, 40), -1.0356697325788677, -0.09012894955181719, -1.53314299475126, 0.037935392650653856]
 
