@@ -135,7 +135,7 @@ def get_vectors(params):
     
     return vectors
 
-def loss_phase(params, guess=False, replacement_params=None):
+def loss_phase(params, guess=False, replacement_params=None, print_out=False):
     '''Returns the loss for the phase optimization'''
     if guess:
         # preset some of the params
@@ -173,11 +173,14 @@ def loss_phase(params, guess=False, replacement_params=None):
     inner_prods = 0
     for i in range(len(vectors)):
         for j in range(i+1, len(vectors)):
-            inner_prods += np.abs(np.dot(vectors[i], vectors[j].conj().T))
+            abs_ij = np.abs(np.dot(vectors[i], vectors[j].conj().T))
+            if print_out:
+                print(f'inner product {i}, {j}: {abs_ij}')
+            inner_prods += abs_ij
 
     return inner_prods
 
-def sum_abs_inner_prods(params):
+def sum_abs_inner_prods(params, print_out=False):
     '''Assumes list of tuples of (phase, index)'''
     # get ordered params to sent to loss_phase
     ordered_params = [0 for _ in range((d-1)*(d//2))]
@@ -185,7 +188,7 @@ def sum_abs_inner_prods(params):
         ordered_params[pair[1]] = pair[0]
 
     # get vectors
-    return loss_phase(ordered_params)
+    return loss_phase(ordered_params, print_out=print_out)
 
 
 
@@ -653,9 +656,13 @@ def create_tuples_from_vectors(vectors, d):
 
         if M.shape[1] > 2:
             # Handle subsequent elements of each row
+            offset = 0
             for j in range(2,M.shape[1]):
-                int_j = j + 2
+                if j > 2 and j % 2 == 0:
+                    offset += 2
+                int_j = j + 2 + offset
                 index1 = i + 1 + increment + int_j * increment
+                
                 index2 = index1 + 2*increment
                 # check if index2 is out of bounds
                 if index2 > d**2//2 - d//2:
@@ -670,7 +677,7 @@ if __name__ == '__main__':
     # get_correlation_classes(6, print_result=True)
 
     # create param
-    d = 8
+    d = 14
    
     # append create tuples from vectors
     vectors = create_orthogonal_vectors(d)
@@ -679,27 +686,103 @@ if __name__ == '__main__':
     # append to numerical params
     numerical_params = tuples
 
-     # first add the eigenphases
-    for i in range(d-1):
-        if i == d-2:
-            numerical_params.append((1/2, i*d//2))
-        elif i %2 == 0:
-            numerical_params.append((0, i*d//2))
-        elif i %2 != 0:
-            numerical_params.append((1/2, i*d//2))
-        else:
-            numerical_params.append((1/2, i*d//2))
+    # numerical_params =[]
+    # first add the eigenphases
+    numerical_params+=[(1/2, d//2), (1/2, 0), (0, 3*d//2)]
+    numerical_params+=[(1/2, 2*d//2), (0,4*d//2)] # first in main
+    numerical_params+=[(1/2, (d**2//2 - 3*d//2)), (0, (d**2//2 - d))] # last in main
+
+    current_5 = 5
+    current_0 = 7
+    for i in range(5, d//2+1):
+        print(current_5*(d//2))
+        numerical_params.append((1/2, current_5*(d//2)))
+        numerical_params.append((0, current_0*(d//2)))
+        current_5 += 1
+        current_0 += 1
+
+
+
+       
+
+    
+   
+
+    # print(numerical_params)
+
+    # sort the numerical params
+    # numerical_params = sorted(numerical_params, key=lambda x: x[1])
+
+
+    # correct_12 = [(1/2, 6), (1/2, 12), (0, 24), (1/2, 30), (0, 42), (1/2, 36), (0, 48), (1/2, 54), (0, 60), (1/2, 0), (0, 18)]
+
+    # # sort
+    # correct_12 = sorted(correct_12, key=lambda x: x[1])
+
+    # # compare
+    # print(numerical_params)
+    # print(correct_12)
+
+    # print(sum_abs_inner_prods(numerical_params))
+        
+
+        
+
+    # numerical_params.append((0, d))
+    # numerical_params.append((1/2, 24))
+    # if d == 12:
+    #     numerical_params.append((1/2,36))
+    #     # numerical_params.append((0,48))
+    #     # numerical_params.append((1/2,24))
+    #     # numerical_params.append((1/2,30))
+    #     numerical_params.append((0,60))
+    # if d == 10:
+    #     numerical_params.append((1/2, 40))
+    #     numerical_params.append((0, 25))
+
+    ## for d = 6
+    # for i in range(d-1):
+    #     if i == d-2:
+    #         numerical_params.append((1/2, i*d//2))
+    #     elif i %2 == 0:
+    #         numerical_params.append((0, i*d//2))
+    #     elif i %2 != 0:
+    #         numerical_params.append((1/2, i*d//2))
+    #     else:
+    #         numerical_params.append((1/2, i*d//2))
  
 
+    
 
     # compute inner products
     get_inner_prods(d, numerical_params=numerical_params)
     # sum([np.exp(np.pi)])
     
-    print(numerical_params)
-    print(sum_abs_inner_prods(numerical_params))
+    # print(numerical_params)
+    # print(sum_abs_inner_prods(numerical_params, print_out=True))
 
     # print(sum([np.exp(2*np.pi*1j/3), 1, np.exp(2*np.pi*1j/3), np.exp(4*np.pi*1j/3), np.exp(4*np.pi*1j/3)]))
+        
+    # params = [(0.16666666666666666, 1), (0.16666666666666666, 19), (0, 7), (0.3333333333333333, 13), (0.3333333333333333, 25), (0.5, 31), (0.5, 43), (0.6666666666666666, 37), (0.6666666666666666, 49), (0.8333333333333334, 43), (0.8333333333333334, 55), (0.3333333333333333, 2), (0.3333333333333333, 20), (0, 8), (0.6666666666666666, 14), (0.6666666666666666, 26), (1.0, 32), (1.0, 44), (1.3333333333333333, 38), (1.3333333333333333, 50), (1.6666666666666667, 44), (1.6666666666666667, 56), (0.5, 3), (0.5, 21), (0, 9), (1.0, 15), (1.0, 27), (1.5, 33), (1.5, 45), (2.0, 39), (2.0, 51), (2.5, 45), (2.5, 57), (0.6666666666666666, 4), (0.6666666666666666, 22), (0, 10), (1.3333333333333333, 16), (1.3333333333333333, 28), (2.0, 34), (2.0, 46), (2.6666666666666665, 40), (2.6666666666666665, 52), (3.3333333333333335, 46), (3.3333333333333335, 58), (0.8333333333333334, 5), (0.8333333333333334, 23), (0, 11), (1.6666666666666667, 17), (1.6666666666666667, 29), (2.5, 35), (2.5, 47), (3.3333333333333335, 41), (3.3333333333333335, 53), (4.166666666666667, 47), (4.166666666666667, 59), (0, 0), (0.5, 6), (0, 12), (0.5, 18), (0, 24), (0.5, 30), (0, 36), (0.5, 42), (0, 48), (0.5, 54), (0.5, 60), (0, 12), (0.5, 36), (0, 48), (0.5, 24), (0.5, 30)]
+
+
+    # p36 = 0.5
+    # p41 = 0.5
+    # p48 = 0.5
+    # p53 = 0.5
+    # p40 = 0.5
+    # p52 = 0.5
+    # p39 = 0.5
+    # p51 = 0.5
+    # p38 = 0.5
+    # p50 = 0.5
+    # p37 = 0.5
+
+
+        
+
+    # val = 1 + np.exp(-2*1j*np.pi*(p36 + p41))*np.exp(2*1j*np.pi*(p48 + p53)) + np.exp(-2*1j*np.pi*(p36 + p40))*np.exp(2*1j*np.pi*(p48 + p52)) + np.exp(-2*1j*np.pi*(p36 + p39))*np.exp(2*1j*np.pi*(p48 + p51)) + np.exp(-2*1j*np.pi*(p36 + p38))*np.exp(2*1j*np.pi*(p48 + p50)) + np.exp(-2*1j*np.pi*(p36 + p37))*np.exp(2*1j*np.pi*(p48 + p49)) + np.exp(-2*1j*np.pi*p41)*np.exp(2*1j*np.pi*p53) + np.exp(-2*1j*np.pi*p40)*np.exp(2*1j*np.pi*p52) + np.exp(-2*1j*np.pi*p39)*np.exp(2*1j*np.pi*p51) + np.exp(-2*1j*np.pi*p38)*np.exp(2*1j*np.pi*p50) + np.exp(-2*1j*np.pi*p37)*np.exp(2*1j*np.pi*p49) + np.exp(-2*1j*np.pi*p36)*np.exp(2*1j*np.pi*p48)
+
 
 
 
