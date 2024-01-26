@@ -5,6 +5,104 @@ from gen_state import make_W_list
 from rho_methods import compute_witnesses, get_rho
 import matplotlib.pyplot as plt
 
+
+def pauli_state(W_mat):
+    """ Checks which pauli matrix combos make up the witness, W_mat
+
+        0 - IxI 4 - XxI 8 - YxI 12 - ZxI
+        1 - IxX 5 - XxX 9 - YxX 13 - ZxX
+        2 - IxY 6 - XxY 10 - YxY 14 - ZxY
+        3 - IxZ 7 - XxZ 11 - YxZ 15 - ZxZ
+    """
+
+    II = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]).flatten()
+    IX = np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]]).flatten()
+    IY = np.array([[0,-1j,0,0],[1j,0,0,0],[0,0,0,-1j],[0,0,1j,0]]).flatten()
+    IZ = np.array([[1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,-1]]).flatten()
+
+    XI = np.array([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]]).flatten()
+    XX = np.array([[0,0,0,1],[0,0,1,0],[0,1,0,0],[1,0,0,0]]).flatten()
+    XY = np.array([[0,0,0,-1j],[0,0,1j,0],[0,-1j,0,0],[1j,0,0,0]]).flatten()
+    XZ = np.array([[0,0,1,0],[0,0,0,-1],[1,0,0,0],[0,-1,0,0]]).flatten()
+
+    YI = np.array([[0,0,-1j,0],[0,0,0,-1j],[1j,0,0,0],[0,1j,0,0]]).flatten()
+    YX = np.array([[0,0,0,-1j],[0,0,1j,0],[0,1j,0,0],[1j,0,0,0]]).flatten()
+    YY = np.array([[0,0,0,-1],[0,0,1,0],[0,1,0,0],[-1,0,0,0]]).flatten()
+    YZ = np.array([[0,0,-1j,0],[0,0,0,1j],[1j,0,0,0],[0,-1j,0,0]]).flatten()
+
+    ZI = np.array([[1,0,0,0],[0,1,0,0],[0,0,-1,0],[0,0,0,-1]]).flatten()
+    ZX = np.array([[0,1,0,0],[1,0,0,0],[0,0,0,-1],[0,0,-1,0]]).flatten()
+    ZY = np.array([[0,-1j,0,0],[1j,0,0,0],[0,0,0,1j],[0,0,-1j,0]]).flatten()
+    ZZ = np.array([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]]).flatten()
+
+    W_flat = W_mat.flatten() 
+    
+    pauli_mats =  [II,IX,IY,IZ,XI,XX,XY,XZ,YI,YX,YY,YZ,ZI,ZX,ZY,ZZ]
+    contains_pauli = [False]*16
+
+    for i in range(len(pauli_mats)):
+        prod = np.dot(pauli_mats[i],W_flat)
+        if prod != 0:
+            contains_pauli[i] = True
+    # # check for IxI, IxZ, ZxI, ZxZ
+    # if mat[0][0]!= 0 and mat[1][1] != 0 and mat[2][2] != 0 and mat[3][3] != 0:
+    #     # check IxI
+    #     if (mat[0][0].real > 0) and (mat[1][1].real > 0) and (mat[2][2].real > 0) and (mat[3][3].real > 0):
+    #         pauli_mats[0] = True
+    #     # check IxZ
+    #     elif (mat[0][0].real > 0) and (mat[1][1].real < 0 ) and (mat[2][2].real > 0) and (mat[3][3].real < 0):
+    #         pauli_mats[3] = True
+    #     # check ZxI
+    #     elif (mat[0][0].real > 0) and (mat[1][1].real > 0) and (mat[2][2].real < 0) and (mat[3][3].real < 0):
+    #         pauli_mats[12] = True
+    #     # check ZxZ
+    #     elif (mat[0][0].real > 0) and (mat[1][1].real < 0 ) and (mat[2][2].real < 0) and (mat[3][3].real > 0):
+    #         pauli_mats[15] = True
+    
+    # # check for IxX, IxY, ZxX, ZxY
+    # if mat[0][1]!= 0 and mat[1][0] != 0 and mat[2][3] != 0 and mat[3][2] != 0:
+    #     # check IxX
+    #     if (mat[0][1].real > 0) and (mat[1][0].real > 0) and (mat[2][3].real > 0) and (mat[3][2].real > 0):
+    #         pauli_mats[1] = True
+    #     # check IxY
+    #     elif (mat[0][1].imag < 0) and (mat[1][0].imag > 0 ) and (mat[2][3].imag < 0) and (mat[3][2].imag > 0):
+    #         pauli_mats[2] = True
+    #     # check ZxX
+    #     elif (mat[0][1].real > 0) and (mat[1][0].real > 0) and (mat[2][3].real < 0) and (mat[3][2].real < 0):
+    #         pauli_mats[13] = True
+    #     # check ZxY
+    #     elif (mat[0][1].imag < 0) and (mat[1][0].imag > 0 ) and (mat[2][3].imag > 0) and (mat[3][2].imag < 0):
+    #         pauli_mats[14] = True
+    # # check for XxI, YxI, XxZ, YxZ
+    # if mat[0][2]!= 0 and mat[1][3] != 0 and mat[2][0] != 0 and mat[3][1] != 0:
+    #     # check XxI
+    #     if (mat[0][2].real > 0) and (mat[1][3].real > 0) and (mat[2][0].real > 0) and (mat[3][1].real > 0):
+    #         pauli_mats[4] = True
+    #     # check YxI
+    #     elif (mat[0][2].imag < 0) and (mat[1][3].imag < 0 ) and (mat[2][0].imag > 0) and (mat[3][1].imag > 0):
+    #         pauli_mats[8] = True
+    #     # check XxZ
+    #     elif (mat[0][2].real > 0) and (mat[1][3].real < 0) and (mat[2][0].real > 0) and (mat[3][1].real < 0):
+    #         pauli_mats[7] = True
+    #     # check YxZ
+    #     elif (mat[0][2].imag < 0) and (mat[1][3].imag > 0 ) and (mat[2][0].imag > 0) and (mat[3][1].imag < 0):
+    #         pauli_mats[11] = True
+    # # check for XxX, XxY, YxX, YxY
+    # if mat[0][3]!= 0 and mat[1][2] != 0 and mat[2][1] != 0 and mat[3][0] != 0:
+    #     # check XxX
+    #     if (mat[0][3].real > 0) and (mat[1][2].real > 0) and (mat[2][1].real > 0) and (mat[3][0].real > 0):
+    #         pauli_mats[5] = True
+    #     # check XxY
+    #     elif (mat[0][3].imag < 0) and (mat[1][2].imag > 0) and (mat[2][1].imag < 0) and (mat[3][0].imag > 0):
+    #         pauli_mats[6] = True
+    #     # check YxX
+    #     elif (mat[0][3].imag < 0) and (mat[1][2].imag < 0) and (mat[2][1].imag > 0) and (mat[3][0].imag > 0):
+    #         pauli_mats[9] = True
+    #     # check YxY
+    #     elif (mat[0][3].real < 0) and (mat[1][2].real > 0) and (mat[2][1].real > 0) and (mat[3][0].real < 0):
+    #         pauli_mats[10] = True
+    return contains_pauli
+
 eta_L = np.array([0,np.pi/4,np.pi/3, np.arccos(-3/5), np.pi/2])
 chi = 0
 
@@ -111,16 +209,17 @@ L = 1/sqrt(2)*(H - 1j*V)
 # a_L = np.linspace(0,1,100)
 a_L = np.linspace(-1,1,10)
 alpha_L = np.linspace(0,np.pi,10)
-beta_L = np.linspace(0,np.pi,10)
+beta_L = np.linspace(0,2*np.pi,10)
 theta_L = np.linspace(0,np.pi,10)
-phi_L = np.linspace(0,np.pi,10)
+phi_L = np.linspace(0,2*np.pi,10)
 
 # scan exhastively through all witness possibilities
 for alpha in alpha_L:
     for beta in beta_L:
         for theta in theta_L:
             for phi in phi_L:
-                W_state = tensor(cos(theta)*H + sin(theta)*np.exp(1j*phi)*V, cos(alpha)*H + sin(alpha)*np.exp(1j*beta)*V) + tensor(cos(alpha)*H + sin(alpha)*np.exp(1j*beta)*V,cos(theta)*H + sin(theta)*np.exp(1j*phi)*V)
+                # psi_A chi_B + psip_A chip_B
+                W_state = tensor(cos(theta)*H + sin(theta)*np.exp(1j*phi)*V, cos(alpha)*H + sin(alpha)*np.exp(1j*beta)*V) + tensor(-np.exp(-1j*phi)*cos(theta)*H + cos(theta)*V,-np.exp(-1j*beta)*cos(alpha)*H + cos(alpha)*V)
                 W = partial_transpose(W_state*W_state.dag(), [0,1])
 
 
@@ -128,27 +227,34 @@ for alpha in alpha_L:
                 mat = W.full()
                 z_first_corr = False # there needs to be a measurement of zx corr and zy corr
                 xy_first_corr = False #  there needs to be a measurement of xz corr and yz corr
-                xz_yz_corr = [mat[0][2], mat[1][3], mat[2][0], mat[3][1]]
-                zx_zy_corr = [mat[0][1], mat[1][0], mat[2][3], mat[3][2]]
                 
-                # if there is both a real and imaginary part to any of the matrix components, 
-                # there must be both xz and yz correlation.
-                for i in range(len(xz_yz_corr)):
-                    if xz_yz_corr[i].imag != 0 and xz_yz_corr[i].real != 0:
+                pauli_mats = pauli_state(mat)
+                
+                if pauli_mats[7] and pauli_mats[11]:
+                    if not pauli_mats[6] and not pauli_mats[9]:
                         xy_first_corr = True
-                    if zx_zy_corr[i].imag != 0 and zx_zy_corr[i].real != 0:
+                
+                elif pauli_mats[13] and pauli_mats[14]:
+                    if not pauli_mats[6] and not pauli_mats[9]:
                         z_first_corr = True
 
-                # define a set of arbitrary HR states to test.
-                for a in a_L:
-                    b = np.sqrt(1-a**2)
-                    test_state = a*tensor(H,R) + b*tensor(R,H)
-                    rho = ket2dm(test_state)
-                    exp_val = (W*rho).tr()
-                    
 
-                    if np.real(exp_val) < 0 and (z_first_corr or xy_first_corr):
-                        print(f"a:{a}, b:{b}, alpha:{alpha}, beta:{beta}, theta:{theta}, phi:{phi}, value:{exp_val}")
+
+                # define a set of arbitrary HR states to test.
+                # for a in a_L:
+                #     b = np.sqrt(1-a**2)
+                #     test_state = a*tensor(H,V) + b*tensor(V,H)
+                #     rho = ket2dm(test_state)
+                #     exp_val = (W*rho).tr()
+                
+                test_state = (1/np.sqrt(2))*(tensor(H,V) + tensor(V,H))
+                rho = ket2dm(test_state)
+                exp_val = (W*rho).tr()
+
+                if np.real(exp_val) < 0 and (z_first_corr or xy_first_corr):
+                    print(f"alpha:{alpha}, beta:{beta}, theta:{theta}, phi:{phi}, value:{exp_val}")
+
+
 
 
 """
