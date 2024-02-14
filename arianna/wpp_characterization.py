@@ -98,9 +98,9 @@ def scan_wit(alpha_L, beta_L, theta_L,phi_L,chi_L, eta_L, lambda_L, gamma_L):
                                     # check if there is an x,z and y,z component simultaneously
                                     mat = W.full()
                                     pauli_mats = pauli_state(mat)
-                                    wit_groups = check_groups(pauli_mats)
+                                    # wit_groups = check_groups(pauli_mats) # for checking which groups of measurements are present
 
-                                    groups[group_count] = wit_groups
+                                    groups[group_count] = pauli_mats
                                     group_count += 1
     return groups
 
@@ -121,7 +121,5 @@ groups = scan_wit(alpha_L, beta_L, theta_L,phi_L,chi_L,eta_L,lambda_L, gamma_L)
 two_groups = {}
 
 for i in range(len(scan_list)):
-    if sum(groups[i]) == 3:
+    if sum(groups[i]) == 3 and groups[i][1] != 0:
         two_groups[i] = groups[i]
-
-print(two_groups)
