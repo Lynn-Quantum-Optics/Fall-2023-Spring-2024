@@ -911,7 +911,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                 elif i==8 or i==11 or i==14: # theta, alpha, and beta
                     
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi)])
+                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi/2),(0, np.pi*2), (0, np.pi*2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -954,7 +954,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                 isi+=1
                 elif i == 15: # the W' alpha witness
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi)])
+                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(0,1), (0, np.pi/2), (0, np.pi/2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -998,7 +998,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                     
                 else:# theta and alpha
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi)])
+                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi/2),(0, np.pi*2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -1064,7 +1064,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                 Wp_t1_param = [x for _,x in sorted(zip(W_expec_vals[6:9], min_params[6:9]),key=lambda x: x[0])][0]
                 Wp_t2_param = [x for _,x in sorted(zip(W_expec_vals[9:12], min_params[9:12]),key=lambda x: x[0])][0]
                 Wp_t3_param = [x for _,x in sorted(zip(W_expec_vals[12:15], min_params[12:15]),key=lambda x: x[0])][0]
-                Wp_alpha_param = [x for _,x in sorted(zip(W_expec_vals[15], min_params[15]),key=lambda x: x[0])][0]
+                Wp_alpha_param = [x for _,x in sorted(zip(W_expec_vals[15:], min_params[15]),key=lambda x: x[0])][0]
 
 
             # calculate lynn
