@@ -1004,7 +1004,6 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                             return do_min['fun']
                         else:
                             return do_min['fun'], do_min['x']
-                        
                     x0 = [0, 0]
                     w0 = min_W(x0,True)
                     x0 = [np.pi/2 , 2*np.pi]
@@ -1073,7 +1072,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
 
             if not(return_all):
                 if return_params:
-                    return W_min, Wp_t1, Wp_t2, Wp_t3, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, Wp_alpha_param
+                    return W_min, Wp_t1, Wp_t2, Wp_t3, Wp_alpha, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, Wp_alpha_param
                 else:
                     if return_lynn:
                         return W_min, Wp_t1, Wp_t2, Wp_t3, W_lynn #add new witnesses here 
