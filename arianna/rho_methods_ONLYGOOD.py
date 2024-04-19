@@ -763,12 +763,31 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
 
         # get the operators
         # take rank 1 projector and return witness
+        #
+        # Get the witnesses for each class of witnesses
+        #
         def get_witness(phi):
             ''' Helper function to compute the witness operator for a given state and return trace(W*rho) for a given state rho.'''
             W = phi * adjoint(phi)
             W = partial_transpose(W) # take partial transpose
             return np.real(np.trace(W @ rho))
+        
+        def get_param_wit(a,b,c,d,beta,gamma,delta):
+            """ Helper function to get the most general parameterized witness with input params, and take the trace
+                inputs: a,b,c,d,beta,gamma,delta - all params to go into the witness
+                output: the expectation value of the parameterized witness for the given input state
+            """
+            W = np.array([[a**2, a*b*np.exp(-1j*beta), a*c*np.exp(-1j*gamma), a*d*np.exp(-1j*delta)],\
+                          [a*b*np.exp(1j*beta), b**2, b*c*np.exp(1j*(beta - gamma)), b*d*np.exp(1j*(beta-delta))],\
+                          [a*c*np.exp(1j*gamma), b*c*np.exp(-1j*(beta - gamma)), c**2, c*d*np.exp(1j*(gamma-delta))],\
+                          [a*d*np.exp(1j*delta), b*d*np.exp(-1j*(beta - delta)), c*d*np.exp(-1j*(gamma-delta)), d**2]
+                        ])
+            W = partial_transpose(W) # take partial transpose
+            return np.real(np.trace(W @ rho))
 
+        #
+        # Specific Witnesses
+        #
         ## ------ for W ------ ##
         def get_W1(param):
             a,b = np.cos(param), np.sin(param)
@@ -840,19 +859,18 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
         if return_lynn_only:
             return get_witness(get_lynn())
         
+        
         def get_wp_alpha(params):
             """
             Witness includes szsy, sxz, and sxy or syx
             params - list of parameters to optimize
             returns - the expectation value of the witness with the input state, rho
             """
-            a, b, beta, gamma = params[0], params[1], params[2], params[3]
-            wit = np.array([[a**2, a*b*np.exp(-1j*beta), a*b*np.exp(-1j*gamma), a**2*np.exp(-1j*(gamma+beta))],\
-                            [a*b*np.exp(1j*beta), b**2, b**2*np.exp(1j*2*beta), a*b*np.exp(-1j*gamma)],\
-                            [a*b*np.exp(1j*gamma), b**2*np.exp(1j*(gamma - beta)), b**2,a*b*np.exp(-1j*beta)],\
-                            [a**2*np.exp(1j*(gamma+beta)), a*b*np.exp(1j*gamma), a*b*np.exp(1j*beta), a**2]])
-            wit = partial_transpose(wit) # take partial transpose
-            return np.real(np.trace(wit @ rho))
+            a, beta, gamma, delta = params[0], params[1], params[2], params[3]
+            b = a*np.sqrt((np.sin(gamma)*np.sin(delta)*np.cos(gamma - delta))/(np.cos(beta)*np.sin(beta-delta)*np.sin(gamma-beta)))
+            c = b*np.sqrt((np.cos(beta)*np.sin(beta-delta))/(np.sin(gamma)*np.cos(gamma-delta)))
+            d = a*np.sqrt((np.sin(gamma)*np.cos(gamma-delta))/(np.cos(beta)*np.sin(beta-delta)))
+            return get_param_wit(a,b,c,d,beta,gamma,delta)
         
         # get the witness values by minimizing the witness function
         if not(ads_test): 
@@ -954,7 +972,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                 isi+=1
                 elif i == 15: # the W' alpha witness
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(0,1), (0, np.pi/2), (0, np.pi/2)])
+                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(0,1), (0, np.pi/2), (0, np.pi*2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
