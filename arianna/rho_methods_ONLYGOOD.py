@@ -867,10 +867,15 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
             returns - the expectation value of the witness with the input state, rho
             """
             a, beta, gamma, delta = params[0], params[1], params[2], params[3]
+            print(params)
+            
             b = a*np.sqrt((np.sin(gamma)*np.sin(delta))/(np.sin(gamma - beta)*np.sin(beta-delta)))
             c = a*np.sqrt((-np.cos(beta)*np.sin(delta))/(np.sin(gamma-beta)*np.cos(gamma-delta)))
             d = a*np.sqrt((-np.sin(gamma)*np.cos(beta))/(np.cos(gamma-delta)*np.sin(beta-delta)))
-            return get_param_wit(a,b,c,d,beta,gamma,delta)
+            # return get_param_wit(a,b,c,d,beta,gamma,delta) for the generic witness
+
+            phi = a*HH + b*np.exp(1j*beta)*HV + c*np.exp(1j*gamma)*VH + d*np.exp(1j*delta)*VV
+            return get_witness(phi)
         
         # get the witness values by minimizing the witness function
         if not(ads_test): 
@@ -929,7 +934,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                 elif i==8 or i==11 or i==14: # theta, alpha, and beta
                     
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi/2),(0, np.pi*2), (0, np.pi*2)])
+                        do_min = minimize(W, x0=x0, bounds=[(0, np.pi/2),(0, np.pi*2), (0, np.pi*2)]) 
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -970,38 +975,55 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                 isi=0
                             else:
                                 isi+=1
-                elif i == 15: # the W' alpha witness
+                elif i == 15: # the V witness
                     def min_W(x0, grad_des):
-                        print(x0)
-                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(1e-6,2*np.pi), (1e-6, 2*np.pi), (1e-6, np.pi*2)])
+                        # print(x0)
+                        do_min = minimize(W, x0=x0)#, bounds=[(0, 1),(0,2*np.pi), (0, 2*np.pi), (0, np.pi*2)]) add bounds back if infinity
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
                         else:
                             return do_min['fun'], do_min['x']
 
-                    x0 = [0, 0, 0, 0]
+                    #x0 = [0, 0, 0, 0]
+                    x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
+                    print("FIRST x0")
                     w0 = min_W(x0, True)
-                    x0 = [1, np.pi/2, np.pi/2 , np.pi/2] # change this based on what the output is
+                    print("SECOND x0")
+                    # x0 = [1, np.pi/2, np.pi/2 , np.pi/2] # change this based on what the output is
+                    x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
                     w1 = min_W(x0, True)
                     if w0 < w1:
                         w_min = w0
-                        x0_best = [0, 0, 0, 0]
+                        # x0_best = [0, 0, 0, 0]
                     else:
                         w_min = w1
-                        x0_best = [1, 0, np.pi/2 , np.pi/2]
+                        # x0_best = [1, 0, np.pi/2 , np.pi/2]
+                        x0_best = x0
                     if optimize:
                         isi = 0 # index since last improvement
+                        count = 0
                         for _ in range(num_reps): # repeat 10 times and take the minimum
+                            count += 1
                             if gd:
                                 if isi == num_reps//2: # if isi hasn't improved in a while, reset to random initial guess
+                                    print("RESTART")
                                     x0 = [np.random.rand(), np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
                                 else:
+                                    print(f"{isi} for GRAD DESCENT")
+                                    if isi == 1: # delete once done debugging
+                                        break
+
+                                    # compute the partial derivative at function to find steepest gradient
                                     min_W_gd = partial(min_W, grad_des=True)
+                                    # find the slope of partial return val
+                                    # grad = approx_fprime(x0, min_W_gd, 1e-6)
                                     grad = approx_fprime(x0, min_W_gd, 1e-6)
+                                    print("GRAD:", grad)
                                     if np.all(grad < 1e-5*np.ones(len(grad))):
                                         x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
                                     else:
+                                        print(f"doing grad des rep {count}")
                                         x0 = x0 - zeta*grad
                             else:
                                 x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
@@ -1091,7 +1113,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
 
             if not(return_all):
                 if return_params:
-                    return W_min, Wp_t1, Wp_t2, Wp_t3, v_1, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, v_1_param
+                    return v_1_param #W_min, Wp_t1, Wp_t2, Wp_t3, v_1, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, v_1_param
                 else:
                     if return_lynn:
                         return W_min, Wp_t1, Wp_t2, Wp_t3, W_lynn #add new witnesses here 
@@ -1099,9 +1121,9 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                         return W_min, Wp_t1, Wp_t2, Wp_t3
             else:
                 if return_params:
-                    return W_expec_vals, min_params
+                    return W_expec_vals[15], min_params[15]#W_expec_vals, min_params
                 else:
-                    return W_expec_vals
+                    return W_expec_vals[15]#W_expec_vals
         else: 
             W2_main= minimize(get_W2, x0=[0], bounds=[(0, np.pi)])
             W2_val = W2_main['fun']
@@ -1213,10 +1235,10 @@ def check_conc_min_eig(rho, printf=False):
 
 ##############################################
 ## for testing ##
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
     ## testing witness functions ##
-    test_witnesses()
+    # test_witnesses()
 
     # from random_gen import *
     # import matplotlib.pyplot as plt
@@ -1320,5 +1342,4 @@ if __name__ == '__main__':
 #     # conditions:
 #         # investigating typeI and type2 errors: type1 = concurrence = 0, min_eig < 0; type2 = concurrence > 0, min_eig > 0
 #     # check_conc_min_eig_sample(N=100, method_name='jones', conditions=((0, 0), (-1000, 0)), func=get_random_jones, special_name='type1')
-#     # check_conc_min_eig_sample(N=1000, method_name='roik', conditions=((0, 0), (-1000, 0)), func=get_random_roik, special_name='conc_0')
-    # pass
+#     # check_conc_min_eig_sample(N=1000, method_name='roik', conditions=((0, 0), (-1000, 0)), func=get_random_roik, special_name='conc_0')# pass
