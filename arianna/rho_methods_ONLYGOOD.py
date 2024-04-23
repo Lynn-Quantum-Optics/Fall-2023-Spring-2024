@@ -860,21 +860,21 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
             return get_witness(get_lynn())
         
         
-        def get_wp_alpha(params):
+        def get_v_1(params):
             """
             Witness includes szsy, sxz, and sxy or syx
             params - list of parameters to optimize
             returns - the expectation value of the witness with the input state, rho
             """
             a, beta, gamma, delta = params[0], params[1], params[2], params[3]
-            b = a*np.sqrt((np.sin(gamma)*np.sin(delta)*np.cos(gamma - delta))/(np.cos(beta)*np.sin(beta-delta)*np.sin(gamma-beta)))
-            c = b*np.sqrt((np.cos(beta)*np.sin(beta-delta))/(np.sin(gamma)*np.cos(gamma-delta)))
-            d = a*np.sqrt((np.sin(gamma)*np.cos(gamma-delta))/(np.cos(beta)*np.sin(beta-delta)))
+            b = a*np.sqrt((np.sin(gamma)*np.sin(delta))/(np.sin(gamma - beta)*np.sin(beta-delta)))
+            c = a*np.sqrt((-np.cos(beta)*np.sin(delta))/(np.sin(gamma-beta)*np.cos(gamma-delta)))
+            d = a*np.sqrt((-np.sin(gamma)*np.cos(beta))/(np.cos(gamma-delta)*np.sin(beta-delta)))
             return get_param_wit(a,b,c,d,beta,gamma,delta)
         
         # get the witness values by minimizing the witness function
         if not(ads_test): 
-            all_W = [get_W1,get_W2, get_W3, get_W4, get_W5, get_W6, get_Wp1, get_Wp2, get_Wp3, get_Wp4, get_Wp5, get_Wp6, get_Wp7, get_Wp8, get_Wp9, get_wp_alpha]
+            all_W = [get_W1,get_W2, get_W3, get_W4, get_W5, get_W6, get_Wp1, get_Wp2, get_Wp3, get_Wp4, get_Wp5, get_Wp6, get_Wp7, get_Wp8, get_Wp9, get_v_1]
             W_expec_vals = []
             if return_params: # to log the params
                 min_params = []
@@ -972,7 +972,8 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                 isi+=1
                 elif i == 15: # the W' alpha witness
                     def min_W(x0, grad_des):
-                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(0,1), (0, np.pi/2), (0, np.pi*2)])
+                        print(x0)
+                        do_min = minimize(W, x0=x0, bounds=[(0, 1),(1e-6,2*np.pi), (1e-6, 2*np.pi), (1e-6, np.pi*2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -981,14 +982,14 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
 
                     x0 = [0, 0, 0, 0]
                     w0 = min_W(x0, True)
-                    x0 = [1, 1, np.pi/2 , np.pi/2] # change this based on what the output is
+                    x0 = [1, np.pi/2, np.pi/2 , np.pi/2] # change this based on what the output is
                     w1 = min_W(x0, True)
                     if w0 < w1:
                         w_min = w0
                         x0_best = [0, 0, 0, 0]
                     else:
                         w_min = w1
-                        x0_best = [1, 1, np.pi/2 , np.pi/2]
+                        x0_best = [1, 0, np.pi/2 , np.pi/2]
                     if optimize:
                         isi = 0 # index since last improvement
                         for _ in range(num_reps): # repeat 10 times and take the minimum
@@ -999,11 +1000,11 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                     min_W_gd = partial(min_W, grad_des=True)
                                     grad = approx_fprime(x0, min_W_gd, 1e-6)
                                     if np.all(grad < 1e-5*np.ones(len(grad))):
-                                        x0 = [np.random.rand(), np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                        x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
                                     else:
                                         x0 = x0 - zeta*grad
                             else:
-                                x0 = [np.random.rand(), np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
 
                             w, w_min_params = min_W(x0,False)
                             
@@ -1071,7 +1072,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
             Wp_t1 = min(W_expec_vals[6:9])
             Wp_t2 = min(W_expec_vals[9:12])
             Wp_t3 = min(W_expec_vals[12:15])
-            Wp_alpha = W_expec_vals[15]
+            v_1 = W_expec_vals[15]
             # print("Wp_t3",W_expec_vals[12:15])
             # print("min_params",min_params[12:15])
 
@@ -1082,7 +1083,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                 Wp_t1_param = [x for _,x in sorted(zip(W_expec_vals[6:9], min_params[6:9]),key=lambda x: x[0])][0]
                 Wp_t2_param = [x for _,x in sorted(zip(W_expec_vals[9:12], min_params[9:12]),key=lambda x: x[0])][0]
                 Wp_t3_param = [x for _,x in sorted(zip(W_expec_vals[12:15], min_params[12:15]),key=lambda x: x[0])][0]
-                Wp_alpha_param = [x for _,x in sorted(zip(W_expec_vals[15:], min_params[15]),key=lambda x: x[0])][0]
+                v_1_param = [x for _,x in sorted(zip(W_expec_vals[15:], min_params[15]),key=lambda x: x[0])][0]
 
 
             # calculate lynn
@@ -1090,7 +1091,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
 
             if not(return_all):
                 if return_params:
-                    return W_min, Wp_t1, Wp_t2, Wp_t3, Wp_alpha, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, Wp_alpha_param
+                    return W_min, Wp_t1, Wp_t2, Wp_t3, v_1, W_param, Wp_t1_param, Wp_t2_param, Wp_t3_param, v_1_param
                 else:
                     if return_lynn:
                         return W_min, Wp_t1, Wp_t2, Wp_t3, W_lynn #add new witnesses here 
