@@ -13,6 +13,7 @@ from functools import partial
 
 from uncertainties import ufloat
 from uncertainties import unumpy as unp
+import numdifftools as nd
 
 ##############################################
 ## for more basic stats about a state ##
@@ -869,10 +870,11 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
             a, beta, gamma, delta = params[0], params[1], params[2], params[3]
             print(params)
             
-            b = a*np.sqrt((np.sin(gamma)*np.sin(delta))/(np.sin(gamma - beta)*np.sin(beta-delta)))
-            c = a*np.sqrt((-np.cos(beta)*np.sin(delta))/(np.sin(gamma-beta)*np.cos(gamma-delta)))
-            d = a*np.sqrt((-np.sin(gamma)*np.cos(beta))/(np.cos(gamma-delta)*np.sin(beta-delta)))
+            b = np.real(a*np.sqrt((np.sin(gamma)*np.sin(delta))/(np.sin(gamma - beta)*np.sin(beta-delta))))
+            c = np.real(a*np.sqrt((-np.cos(beta)*np.sin(delta))/(np.sin(beta-gamma)*np.cos(gamma-delta))))
+            d = np.real(a*np.sqrt((-np.sin(gamma)*np.cos(beta))/(np.cos(gamma-delta)*np.sin(beta-delta))))
             # return get_param_wit(a,b,c,d,beta,gamma,delta) for the generic witness
+
 
             phi = a*HH + b*np.exp(1j*beta)*HV + c*np.exp(1j*gamma)*VH + d*np.exp(1j*delta)*VV
             return get_witness(phi)
@@ -1014,11 +1016,13 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                                     if isi == 1: # delete once done debugging
                                         break
 
-                                    # compute the partial derivative at function to find steepest gradient
-                                    min_W_gd = partial(min_W, grad_des=True)
-                                    # find the slope of partial return val
+                                    # compute a partial at function to find steepest gradient
+                                    # min_W_gd = partial(min_W, grad_des=True)
+                                    min_W_gd = lambda x: min_W(x, grad_des=True)
+                                    grad = nd.Gradient(min_W_gd)(x0) 
+                                    # get the partial derivative at x0
                                     # grad = approx_fprime(x0, min_W_gd, 1e-6)
-                                    grad = approx_fprime(x0, min_W_gd, 1e-6)
+                                    # grad = approx_fprime(x0, min_W_gd, 1e-6)
                                     print("GRAD:", grad)
                                     if np.all(grad < 1e-5*np.ones(len(grad))):
                                         x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
