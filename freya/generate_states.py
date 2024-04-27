@@ -1,3 +1,8 @@
+# This is segments of mixedstates.ipynb put in a normal Python file so they can be imported by my other files.
+# The wrapper function generate_states lets you pass how many states you want and whether you want (uniform) pure states or
+# (almost certainly not uniform) mixed states. make_cs and make_s_mat (change of basis matrix) may be useful as well.
+# If you want to use or modify my code, this is the file to import/edit.
+
 import numpy as np
 import dataclasses
 
