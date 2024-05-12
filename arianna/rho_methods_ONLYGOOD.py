@@ -864,16 +864,24 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
         def get_v_1(params):
             """
             Witness includes szsy, sxz, and sxy or syx
-            params - list of parameters to optimize
+            params - list of parameters to optimize, note a^2 + b^2 + c^2 + d^2 = 1 and a,b,c,d > 0 and real.
             returns - the expectation value of the witness with the input state, rho
             """
-            a, beta, gamma, delta = params[0], params[1], params[2], params[3]
+
+            # [TODO]: figure out which params send a,b,c,d to infinity]
+            beta, gamma, delta = params[0], params[1], params[2]
+
+            # for debugging
             print(params)
-            
+
+            # Witness constraints  
+            a = np.real((np.sin(beta - delta)*np.sin(beta - gamma)*np.cos(gamma - delta))/(np.sin(beta - delta)*np.sin(beta - gamma)*np.cos(gamma - delta) +\
+                          np.sin(gamma)*np.sin(delta)*np.cos(gamma - delta) -\
+                          np.cos(beta)*np.sin(delta)*np.sin(beta-delta) -\
+                          np.sin(gamma)*np.cos(beta)*np.sin(beta - gamma)))
             b = np.real(a*np.sqrt((np.sin(gamma)*np.sin(delta))/(np.sin(gamma - beta)*np.sin(beta-delta))))
             c = np.real(a*np.sqrt((-np.cos(beta)*np.sin(delta))/(np.sin(beta-gamma)*np.cos(gamma-delta))))
             d = np.real(a*np.sqrt((-np.sin(gamma)*np.cos(beta))/(np.cos(gamma-delta)*np.sin(beta-delta))))
-            # return get_param_wit(a,b,c,d,beta,gamma,delta) for the generic witness
 
 
             phi = a*HH + b*np.exp(1j*beta)*HV + c*np.exp(1j*gamma)*VH + d*np.exp(1j*delta)*VV
@@ -886,17 +894,17 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
             if return_params: # to log the params
                 min_params = []
             for i, W in enumerate(all_W):
-                if i <= 5: # just theta optimization
+                if i <= 5: # just theta optimization, witnesses 1-6
+
                     # get initial guess at boundary
                     def min_W(x0, grad_des):
                         do_min = minimize(W, x0=x0, bounds=[(0, np.pi)])
-                        # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
                         else:
                             return do_min['fun'], do_min['x']
 
-                    
+                    # make two intial guesses to scipy optimize, take the best 
                     x0 = [0]
                     w0 = min_W(x0, True)
                     x0 = [np.pi]
@@ -908,18 +916,22 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                         w_min = w1
                         x0_best = [np.pi]
                     
+                    # to escape local minima, run scipy optimize with a small displacement each time stuck
                     if optimize:
                         isi = 0 # index since last improvement
                         for _ in range(num_reps): # repeat 10 times and take the minimum
-                            if gd:
+                            if gd: #if we specify to do gradient descent
                                 if isi == num_reps//2: # if isi hasn't improved in a while, reset to random initial guess
                                     x0 = [np.random.rand()*np.pi]
                                 else:
-                                    min_W_gd = partial(min_W, grad_des=True)
+                                    # get the gradient of W at x0 
+                                    min_W_gd = partial(min_W, grad_des=True) # to get a function passable to approx_fprime
                                     grad = approx_fprime(x0, min_W_gd, 1e-6)
+
                                     if np.all(grad < 1e-5*np.ones(len(grad))):
                                         break
                                     else:
+                                        # increment x0 to escape any local optima
                                         x0 = x0 - zeta*grad
                             else:
                                 x0 = [np.random.rand()*np.pi]
@@ -980,7 +992,7 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                 elif i == 15: # the V witness
                     def min_W(x0, grad_des):
                         # print(x0)
-                        do_min = minimize(W, x0=x0)#, bounds=[(0, 1),(0,2*np.pi), (0, 2*np.pi), (0, np.pi*2)]) add bounds back if infinity
+                        do_min = minimize(W, x0=x0, bounds=[(1e-2,2*np.pi - 1e-2), (1e-2, 2*np.pi - 1e-2), (1e-2, np.pi*2 - 1e-2)])
                         # print(do_min['x'])
                         if grad_des:
                             return do_min['fun']
@@ -988,20 +1000,22 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                             return do_min['fun'], do_min['x']
 
                     #x0 = [0, 0, 0, 0]
-                    x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
+                    # x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
+                    x0 = [np.random.rand(), np.random.rand(), np.random.rand()]
                     print("FIRST x0")
                     w0 = min_W(x0, True)
                     print("SECOND x0")
                     # x0 = [1, np.pi/2, np.pi/2 , np.pi/2] # change this based on what the output is
-                    x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
-                    w1 = min_W(x0, True)
+                    # x0 = [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()]
+                    x1 = [np.random.rand(), np.random.rand(), np.random.rand()]
+                    w1 = min_W(x1, True)
                     if w0 < w1:
                         w_min = w0
-                        # x0_best = [0, 0, 0, 0]
+                        x0_best = x0
                     else:
                         w_min = w1
                         # x0_best = [1, 0, np.pi/2 , np.pi/2]
-                        x0_best = x0
+                        x0_best = x1
                     if optimize:
                         isi = 0 # index since last improvement
                         count = 0
@@ -1010,27 +1024,46 @@ def compute_witnesses(rho, counts = None, expt = False, do_counts = False, expt_
                             if gd:
                                 if isi == num_reps//2: # if isi hasn't improved in a while, reset to random initial guess
                                     print("RESTART")
-                                    x0 = [np.random.rand(), np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                    # x0 = [np.random.rand(), np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                    x0 = [np.random.rand(), np.random.rand(), np.random.rand()]
                                 else:
-                                    print(f"{isi} for GRAD DESCENT")
+                                    print(f"{count} for GRAD DESCENT")
                                     if isi == 1: # delete once done debugging
                                         break
 
-                                    # compute a partial at function to find steepest gradient
+                                   
+
+                                    # x0 = beta, gamma, delta
+                                    if (x0[0] - x0[2] != np.pi) and (x0[0] - x0[2] != 0) \
+                                        and (x0[0] - x0[1] != np.pi) and (x0[0] - x0[1] != 0) \
+                                        and (x0[1] - x0[2] != np.pi/2) and (x0[1] - x0[2] != 3*np.pi/2):
+                                        print("test")
+                                        min_W_gd = partial(min_W, grad_des=True)
+                                    # get the partial derivative at x0
+                                        grad = approx_fprime(x0, min_W_gd, 1e-6)
+
+                                        # min_W_gd = lambda x: min_W(x, grad_des=True)
+                                        # grad = nd.Gradient(min_W_gd)(x0)
+                                    else:
+                                        x0 = [np.random.rand(), np.random.rand(), np.random.rand()]
+
+                                     # compute a partial at function to find steepest gradient
                                     # min_W_gd = partial(min_W, grad_des=True)
-                                    min_W_gd = lambda x: min_W(x, grad_des=True)
-                                    grad = nd.Gradient(min_W_gd)(x0) 
                                     # get the partial derivative at x0
                                     # grad = approx_fprime(x0, min_W_gd, 1e-6)
                                     # grad = approx_fprime(x0, min_W_gd, 1e-6)
                                     print("GRAD:", grad)
                                     if np.all(grad < 1e-5*np.ones(len(grad))):
-                                        x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                        # x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                        x0 = [np.random.rand(), np.random.rand(), np.random.rand()]
                                     else:
                                         print(f"doing grad des rep {count}")
                                         x0 = x0 - zeta*grad
+                                    if count == 1:
+                                        break
                             else:
-                                x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                # x0 = [np.random.rand(), np.random.rand()*np.pi/2, np.random.rand()*np.pi/2, np.random.rand()*np.pi/2]
+                                x0 = [np.random.rand(), np.random.rand(), np.random.rand()]
 
                             w, w_min_params = min_W(x0,False)
                             

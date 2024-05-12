@@ -4,13 +4,13 @@ from tqdm import trange
 from datetime import datetime
 import sys
 
-def measure_wp_alpha_test(calculate=True):
+def measure_v_1_test(calculate=True):
     if calculate:
         df = pd.read_csv('random_gen/data/roik_True_400000_r_os_t.csv')
         df = df[df['concurrence'] > 0]
 
         # compute lynn's 
-        wp_alpha_list = []
+        v_1_list = []
         for i in trange(len(df)):
             row = df.iloc[i]
             # get params
@@ -28,11 +28,12 @@ def measure_wp_alpha_test(calculate=True):
             all_projs.append([row['RH'], row['RV'], row['RD'], row['RA'], row['RR'], row['RL']])
             all_projs.append([row['LH'], row['LV'], row['LD'], row['LA'], row['LR'], row['LL']])
             rho_recons = reconstruct_rho(all_projs)
-            wp_alpha = compute_witnesses(rho_recons, return_all=False, return_params=True)[4]
-            wp_alpha_list.append(wp_alpha)
+            v_1 = compute_witnesses(rho_recons, return_all=False, return_params=True)[4]
+            v_1_list.append(v_1)
+
 
         # append to df
-        df['wp_alpha'] = wp_alpha_list
+        df['v_1'] = v_1_list
 
         # save to csv
         df.to_csv('random_gen/data/lynn_data_400000_posconc_wlynn.csv', index=False)
@@ -41,13 +42,14 @@ def measure_wp_alpha_test(calculate=True):
         df = pd.read_csv('random_gen/data/roik_True_400000_r_os_t_wlynn.csv')
 
     # check overlap of lynn's witness and w, wp1, wp2, wp3
-    wp_alpha = np.where(df['wp_alpha'] < 0, 1, 0)
+    v_1 = np.where(df['v_1'] < 0, 1, 0)
+    print(v_1)
     # w_witness = np.where(df['W_min'] < 0, 1, 0)
     # wp1_witness = np.where(df['Wp_t1'] < 0, 1, 0)
     # wp2_witness = np.where(df['Wp_t2'] < 0, 1, 0)
     # wp3_witness = np.where(df['Wp_t3'] < 0, 1, 0)
 
-    print(wp_alpha)
+    print(v_1)
 
 if __name__ == '__main__':
-    measure_wp_alpha_test()
+    measure_v_1_test()
