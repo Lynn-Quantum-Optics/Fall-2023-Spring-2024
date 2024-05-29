@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 ## note: get_random_jones is in jones.py ##
-from rho_methods import *
+from rho_methods_ONLYGOOD import *
 from sample_rho import *
 
 def get_random_simplex(return_params=False):
@@ -212,3 +212,4 @@ def get_random_E1(return_params = True):
 
     if return_params: return [E1,angles]
     else: return E1
+

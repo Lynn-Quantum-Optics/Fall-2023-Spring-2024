@@ -2,7 +2,7 @@ from qutip import *
 from math import sqrt, cos, sin
 import numpy as np
 from gen_state import make_E0, make_W_list
-from rho_methods import compute_witnesses, get_rho
+from rho_methods_ONLYGOOD import compute_witnesses, get_rho
 import matplotlib.pyplot as plt
 
 chi_range = np.linspace(0,np.pi/2, 6) # for a hundred values of chi

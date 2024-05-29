@@ -1,6 +1,6 @@
 # file to hold sample density matrices
 import numpy as np
-from rho_methods import *
+from rho_methods_ONLYGOOD import *
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import fractions

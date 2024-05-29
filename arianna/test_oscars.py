@@ -2,7 +2,7 @@ from qutip import *
 from math import sqrt, cos, sin
 import numpy as np
 # from gen_state import make_W, make_E0, make_WPrimes
-from rho_methods import compute_witnesses, get_rho
+from rho_methods_ONLYGOOD import compute_witnesses, get_rho
 import matplotlib.pyplot as plt
 
 state = np.array([[1],[0],[0],[0]])
